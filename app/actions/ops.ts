@@ -8,7 +8,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { toCents } from "@/lib/money";
-import { startPacking, markShipped, markDelivered, recordPayment, adjust, UserError } from "@/lib/orders";
+import { startPacking, markShipped, markDelivered, recordPayment, adjust, setShippingFee, UserError } from "@/lib/orders";
 import { audit } from "@/lib/audit";
 import { runWeeklyStatements } from "@/lib/statements";
 
@@ -51,6 +51,14 @@ export async function shipOrder(_: OpsState, form: FormData) {
       .parse(Object.fromEntries(form));
     await markShipped(p.orderId, u, { carrier: p.carrier, trackingNo: p.trackingNo, shippingFeeCents: p.fee });
   }, "Marked shipped.");
+}
+
+export async function fixShippingFee(_: OpsState, form: FormData) {
+  const u = await requireRole("ADMIN", "FULFILLMENT");
+  return run(async () => {
+    const p = z.object({ orderId: z.string(), fee: money, reason: z.string().trim().min(3, "A reason is required").max(200) }).parse(Object.fromEntries(form));
+    await setShippingFee(p.orderId, u, p.fee, p.reason);
+  }, "Shipping fee updated.");
 }
 
 export async function deliverOrder(orderId: string) {

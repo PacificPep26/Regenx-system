@@ -4,7 +4,7 @@ import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { submitOrder, cancelOrder, approveHold, deleteDraft } from "@/app/actions/orders";
-import { packOrder, shipOrder, deliverOrder } from "@/app/actions/ops";
+import { packOrder, shipOrder, deliverOrder, fixShippingFee } from "@/app/actions/ops";
 import { useDialog } from "./Dialog";
 
 type Props = {
@@ -22,6 +22,8 @@ export function OrderActions({ orderId, status, role, editHref, listHref }: Prop
   const [shipOpen, setShipOpen] = useState(false);
   const { dialog, confirm, prompt } = useDialog();
   const [shipState, shipAction, shipping] = useActionState(shipOrder, undefined);
+  const [feeOpen, setFeeOpen] = useState(false);
+  const [feeState, feeAction, feeSaving] = useActionState(fixShippingFee, undefined);
   const isAdmin = role === "ADMIN";
   const isOps = isAdmin || role === "FULFILLMENT";
   const isPartner = role.startsWith("PARTNER");
@@ -52,6 +54,7 @@ export function OrderActions({ orderId, status, role, editHref, listHref }: Prop
         {status === "ON_HOLD" && isAdmin && <button className="btn-primary" disabled={pending} onClick={() => act(() => approveHold(orderId))}>Approve overage</button>}
         {status === "APPROVED" && isOps && <button className="btn-primary" disabled={pending} onClick={() => act(() => packOrder(orderId))}>Start packing</button>}
         {(status === "PACKING" || status === "APPROVED") && isOps && <button className="btn" onClick={() => setShipOpen(!shipOpen)}>Mark shipped…</button>}
+        {(status === "SHIPPED" || status === "DELIVERED") && isOps && <button className="btn" onClick={() => setFeeOpen(!feeOpen)}>Shipping fee…</button>}
         {status === "SHIPPED" && isOps && <button className="btn-primary" disabled={pending} onClick={() => act(() => deliverOrder(orderId))}>Mark delivered</button>}
         {canCancel && status !== "DRAFT" && (
           <button
@@ -72,6 +75,19 @@ export function OrderActions({ orderId, status, role, editHref, listHref }: Prop
           </button>
         )}
       </div>
+      {feeOpen && (
+        <form action={feeAction} className="panel grid grid-cols-1 gap-2 p-3 sm:grid-cols-4">
+          <input type="hidden" name="orderId" value={orderId} />
+          <div><label className="label">New shipping fee ($)</label><input name="fee" required inputMode="decimal" className="input" placeholder="0.00 = waive" /></div>
+          <div className="sm:col-span-3"><label className="label">Reason (required)</label><input name="reason" required minLength={3} className="input" placeholder="e.g. carrier re-weigh, free shipping promo" /></div>
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-4">
+            <button className="btn-primary" disabled={feeSaving}>Update fee</button>
+            <span className="text-xs text-gray-500">Raising it bills the difference; lowering removes what is owed and returns any part already paid to prepaid credit.</span>
+            {feeState?.error && <span className="text-sm text-red">{feeState.error}</span>}
+            {feeState?.ok && <span className="text-sm text-ok">{feeState.ok}</span>}
+          </div>
+        </form>
+      )}
       {shipOpen && (
         <form action={shipAction} className="panel grid grid-cols-1 gap-2 p-3 sm:grid-cols-4">
           <input type="hidden" name="orderId" value={orderId} />

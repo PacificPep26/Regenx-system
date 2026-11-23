@@ -210,3 +210,37 @@ export function adjust(storeId: string, actor: Actor, a: { bucket: "CREDIT" | "O
     await audit(tx, actor.id, `ledger.${a.type.toLowerCase()}`, "Store", storeId, a);
   });
 }
+
+/**
+ * Correct (raise, lower or waive) the shipping fee of an already shipped order, with a reason.
+ * Raising bills the difference to the SHIPPING bucket. Lowering removes what is still owed there; any part the
+ * partner had already paid goes back to prepaid credit, so no negative "shipping" balance is left behind.
+ */
+export function setShippingFee(orderId: string, actor: Actor, newFeeCents: number, reason: string) {
+  return db.$transaction(async (tx) => {
+    if (!Number.isInteger(newFeeCents) || newFeeCents < 0) throw new UserError("Shipping fee cannot be negative.");
+    if (reason.trim().length < 3) throw new UserError("A reason is required.");
+    const head = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { storeId: true } });
+    await lockStore(tx, head.storeId);
+    const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { store: true } });
+    if (o.status !== "SHIPPED" && o.status !== "DELIVERED") throw new UserError("The shipping fee is set when the order ships; it can be corrected once shipped.");
+    const old = o.shippingFeeCents ?? 0;
+    const delta = newFeeCents - old;
+    if (delta === 0) throw new UserError("That is already the shipping fee.");
+    const memo = `Shipping fee #${o.number} ${formatUSD(old)} -> ${formatUSD(newFeeCents)}: ${reason.trim()}`;
+    const base = { storeId: o.storeId, orderId, createdById: actor.id, type: "ADJUSTMENT" as const, memo };
+    if (delta > 0) {
+      await tx.ledgerEntry.create({ data: { ...base, bucket: "SHIPPING", amountCents: delta } });
+    } else {
+      const owed = Math.max((await getBalances(o.storeId, { tx })).SHIPPING, 0);
+      const fromOwed = Math.min(-delta, owed);
+      const toCredit = -delta - fromOwed;
+      if (fromOwed) await tx.ledgerEntry.create({ data: { ...base, bucket: "SHIPPING", amountCents: -fromOwed } });
+      if (toCredit) await tx.ledgerEntry.create({ data: { ...base, bucket: "CREDIT", amountCents: toCredit } });
+    }
+    await tx.order.update({ where: { id: orderId }, data: { shippingFeeCents: newFeeCents } });
+    await settleStatements(tx, o.storeId);
+    await notify(tx, { audience: "STORE", storeId: o.storeId, title: `Shipping fee on order #${o.number} changed to ${formatUSD(newFeeCents)}`, body: reason.trim(), link: `/s/${o.store.slug}/orders/${orderId}` });
+    await audit(tx, actor.id, "order.shipping_fee", "Order", orderId, { from: old, to: newFeeCents, reason });
+  });
+}
