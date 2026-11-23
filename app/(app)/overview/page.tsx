@@ -4,11 +4,13 @@ import { requireRole } from "@/lib/auth";
 import { health } from "@/lib/balances";
 import { Badge, Money, PageHeader, Stat, fmtDate } from "@/components/ui";
 import { RunStatements } from "./RunStatements";
+import { GpBoard } from "@/components/GpBoard";
+import type { SP } from "@/lib/query";
 
 const DOT = { green: "bg-ok", yellow: "bg-warn", red: "bg-red" };
 const TOP = 8; // every list here is a bounded "top N" with a link to the full, paginated page
 
-export default async function Overview() {
+export default async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
   await requireRole("ADMIN");
   const weekAgo = new Date(Date.now() - 7 * 86400000);
   const [totalsAgg, storeCount, attention, holdCount, holds, queue, overdueCount, overdue, week, late, lowStock] = await Promise.all([
@@ -31,7 +33,7 @@ export default async function Overview() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Overview" actions={<RunStatements />} />
+      <PageHeader title="Home" actions={<RunStatements />} />
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <Stat label="7-day wholesale" cents={week._sum.totalCents ?? 0} tone="ok" />
         <Stat label="Partner credit held" cents={totals.credit} />
@@ -42,7 +44,7 @@ export default async function Overview() {
         <Link href="/fulfillment?status=APPROVED" className="panel border-t-4 border-t-navy p-3"><div className="text-2xl font-bold">{q.APPROVED ?? 0}</div><div className="label">To pack</div></Link>
         <Link href="/fulfillment?status=PACKING" className="panel border-t-4 border-t-navy p-3"><div className="text-2xl font-bold">{q.PACKING ?? 0}</div><div className="label">Packing</div></Link>
         <a href="#holds" className="panel border-t-4 border-t-red p-3"><div className="text-2xl font-bold text-red">{holdCount}</div><div className="label">On hold</div></a>
-        <Link href="/gp" className={`panel border-t-4 p-3 ${late ? "border-t-red" : "border-t-navy"}`}><div className={`text-2xl font-bold ${late ? "text-red" : ""}`}>{late}</div><div className="label">Late &gt; 48h</div></Link>
+        <Link href="#warehouse" className={`panel border-t-4 p-3 ${late ? "border-t-red" : "border-t-navy"}`}><div className={`text-2xl font-bold ${late ? "text-red" : ""}`}>{late}</div><div className="label">Late &gt; 48h</div></Link>
         <Link href="/stock?status=low" className={`panel border-t-4 p-3 ${lowStock[0]?.n ? "border-t-red" : "border-t-navy"}`}><div className={`text-2xl font-bold ${lowStock[0]?.n ? "text-red" : ""}`}>{lowStock[0]?.n ?? 0}</div><div className="label">Low stock</div></Link>
       </div>
 
@@ -103,6 +105,7 @@ export default async function Overview() {
           {more(overdueCount, "/statements?status=OVERDUE", "All overdue")}
         </section>
       )}
+      <GpBoard searchParams={searchParams} embedded />
     </div>
   );
 }
