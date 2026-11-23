@@ -5,7 +5,7 @@ import { Nav, type NavStore } from "@/components/Nav";
 import { unreadCounts } from "@/lib/notify";
 import { newOrderCounts } from "@/lib/newOrders";
 
-const SIDEBAR_STORES = 8; // admin/GP may manage hundreds of stores: the sidebar shows only the ones needing attention
+const SIDEBAR_STORES = 12; // admin/GP may manage hundreds of stores: the sidebar shows only the ones needing attention
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();

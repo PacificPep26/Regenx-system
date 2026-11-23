@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Role } from "@prisma/client";
 import {
   Bell, Menu, X, LayoutDashboard, Gauge, Inbox, Truck, Store, FileText, Package, Search,
-  ShoppingCart, Users, Contact, Boxes, BarChart3, ShieldCheck, MessageSquare, BookOpen, Settings, UserRound, LogOut, type LucideIcon,
+  Contact, Boxes, BarChart3, ChevronDown, ShieldCheck, MessageSquare, UserRound, LogOut, type LucideIcon,
 } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { NotificationBell } from "./NotificationBell";
@@ -68,12 +68,23 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
     setOpen(false);
   }, [path]);
 
-  const top: Item[] =
+  // frequent items stay on top; rarely-needed admin pages are grouped under "Manage" at the bottom
+  const primary: Item[] =
     role === "ADMIN"
-      ? [["/overview", "Overview", LayoutDashboard], ["/reports", "Reports", BarChart3], ["/gp", "GP dashboard", Gauge], ["/inbox", "Inbox", Inbox], ["/fulfillment", "Fulfillment", Truck], ["/stock", "Stock", Boxes], ["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/users", "Users", ShieldCheck], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package], ["/search", "Search", Search]]
+      ? [["/overview", "Overview", LayoutDashboard], ["/inbox", "Inbox", Inbox], ["/fulfillment", "Fulfillment", Truck], ["/stock", "Stock", Boxes], ["/reports", "Reports", BarChart3], ["/gp", "GP dashboard", Gauge], ["/search", "Search", Search]]
       : role === "FULFILLMENT"
-        ? [["/gp", "Dashboard", Gauge], ["/inbox", "Inbox", Inbox], ["/fulfillment", "Fulfillment", Truck], ["/stock", "Stock", Boxes], ["/customers", "Customers", Contact], ["/catalog", "Catalog", Package], ["/search", "Search", Search]]
+        ? [["/gp", "Dashboard", Gauge], ["/inbox", "Inbox", Inbox], ["/fulfillment", "Fulfillment", Truck], ["/stock", "Stock", Boxes], ["/search", "Search", Search]]
         : [["/catalog", "Price list", Package], ["/search", "Search", Search]];
+  const manage: Item[] =
+    role === "ADMIN"
+      ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/users", "Users", ShieldCheck], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package]]
+      : role === "FULFILLMENT"
+        ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/catalog", "Catalog", Package]]
+        : [];
+  const [storeQ, setStoreQ] = useState("");
+  const shownStores = stores.filter((x) => x.name.toLowerCase().includes(storeQ.trim().toLowerCase()));
+  const storeAlerts = stores.reduce((n, x) => n + (live.newOrders?.[x.id] ?? x.newOrders) + ((live.chatByStore[x.id] ?? 0) > 0 ? 1 : 0), 0);
+  const manageActive = manage.some(([h]) => path === h || path.startsWith(h + "/"));
 
   const link = ([href, label, Icon]: Item, indent = false, count = 0) => {
     const active = path === href || (href !== "/" && path.startsWith(href + "/"));
@@ -106,7 +117,7 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
       </header>
       {open && <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setOpen(false)} />}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col overflow-y-auto border-r border-line bg-white transition-transform print:hidden md:sticky md:top-0 md:h-dvh md:w-60 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col overflow-hidden border-r border-line bg-white transition-transform print:hidden md:sticky md:top-0 md:h-dvh md:w-60 md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -117,44 +128,59 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
           </div>
           <div className="hidden md:block">{bell}</div>
         </div>
-        <nav className="py-2">
-          {top.map((it) => link(it, false, it[0] === "/inbox" ? live.chat : 0))}
-          {stores.length > 0 && <div className="mt-3 px-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Stores</div>}
-          {stores.map((s) => {
-            const base = `/s/${s.slug}`;
-            const inStore = path.startsWith(base + "/") || path === base;
-            return (
-              <div key={s.slug}>
-                <Link href={`${base}/dashboard`} className={`flex items-center gap-2 py-2 pl-4 pr-3 text-sm ${inStore ? "font-semibold text-navy" : "text-gray-700 hover:bg-hover"}`}>
-                  <span className={`h-2.5 w-2.5 shrink-0 ${DOT[s.health]}`} />
-                  <span className="min-w-0 flex-1 truncate">{s.name}</span>
-                  {(live.chatByStore[s.id] ?? 0) > 0 && <MessageSquare size={12} className="shrink-0 text-red" aria-label="unread chat" />}
-                  {(live.newOrders?.[s.id] ?? s.newOrders) > 0 && (
-                    <span className="flex items-center gap-0.5 bg-red px-1.5 text-[11px] font-bold text-white" title={`${live.newOrders?.[s.id] ?? s.newOrders} new order(s)`}>
-                      <Bell size={10} strokeWidth={2.5} />
-                      {live.newOrders?.[s.id] ?? s.newOrders}
-                    </span>
-                  )}
-                </Link>
-                {(inStore || stores.length === 1) && (
-                  <div>
-                    {link([`${base}/dashboard`, "Dashboard", LayoutDashboard], true)}
-                    {link([`${base}/orders`, "Orders", ShoppingCart], true)}
-                    {link([`${base}/customers`, "Customers", Users], true)}
-                    {link([`${base}/chat`, "Chat", MessageSquare], true, live.chatByStore[s.id] ?? 0)}
-                    {s.showMoney && link([`${base}/ledger`, "Ledger", BookOpen], true)}
-                    {s.showMoney && link([`${base}/statements`, "Statements", FileText], true)}
-                    {role === "ADMIN" && link([`${base}/settings`, "Settings", Settings], true)}
-                  </div>
-                )}
+        <nav className="min-h-0 flex-1 overflow-y-auto py-2">
+          {primary.map((it) => link(it, false, it[0] === "/inbox" ? live.chat : 0))}
+          {stores.length > 0 && (
+            <details open className="group mt-2">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 hover:bg-hover [&::-webkit-details-marker]:hidden">
+                <span>Stores · {totalStores}</span>
+                <span className="flex items-center gap-2">
+                  {storeAlerts > 0 && <span className="bg-red px-1.5 text-[10px] font-bold text-white group-open:hidden">{storeAlerts}</span>}
+                  <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+                </span>
+              </summary>
+              {stores.length > 5 && (
+                <div className="px-3 pb-1">
+                  <input type="search" className="input h-8 text-xs" placeholder="Filter stores…" value={storeQ} onChange={(e) => setStoreQ(e.target.value)} aria-label="Filter stores" />
+                </div>
+              )}
+              <div className="max-h-[38dvh] overflow-y-auto">
+                {shownStores.map((s) => {
+                  const base = `/s/${s.slug}`;
+                  const inStore = path.startsWith(base + "/") || path === base;
+                  const fresh = live.newOrders?.[s.id] ?? s.newOrders;
+                  return (
+                    <Link key={s.slug} href={`${base}/dashboard`} className={`flex items-center gap-2 border-l-4 py-2 pl-3 pr-3 text-sm ${inStore ? "border-red bg-soft font-semibold text-navy" : "border-transparent text-gray-700 hover:bg-hover"}`}>
+                      <span className={`h-2.5 w-2.5 shrink-0 ${DOT[s.health]}`} />
+                      <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                      {(live.chatByStore[s.id] ?? 0) > 0 && <MessageSquare size={12} className="shrink-0 text-red" aria-label="unread chat" />}
+                      {fresh > 0 && (
+                        <span className="flex items-center gap-0.5 bg-red px-1.5 text-[11px] font-bold text-white" title={`${fresh} new order(s)`}>
+                          <Bell size={10} strokeWidth={2.5} />
+                          {fresh}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+                {!shownStores.length && <p className="px-4 py-2 text-xs text-gray-500">No match. Use All stores for more.</p>}
               </div>
-            );
-          })}
-          {(role === "ADMIN" || role === "FULFILLMENT") && totalStores > stores.length && (
-            <Link href="/stores" className="block px-4 py-2 text-sm font-medium text-navy hover:bg-hover">All stores ({totalStores}) →</Link>
+              {(role === "ADMIN" || role === "FULFILLMENT") && totalStores > stores.length && (
+                <Link href="/stores" className="block px-4 py-2 text-sm font-medium text-navy hover:bg-hover">All stores ({totalStores}) →</Link>
+              )}
+            </details>
           )}
         </nav>
-        <div className="mt-auto border-t border-line py-2">
+        <div className="shrink-0 border-t border-line py-2">
+          {manage.length > 0 && (
+            <details key={manageActive ? "open" : "closed"} open={manageActive} className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 hover:bg-hover [&::-webkit-details-marker]:hidden">
+                Manage
+                <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+              </summary>
+              {manage.map((it) => link(it))}
+            </details>
+          )}
           <div className="px-4 py-1 text-xs text-gray-500">{userName} · {role.replace("_", " ").toLowerCase()}</div>
           {link(["/account", "Account", UserRound])}
           <form action={logout}>
