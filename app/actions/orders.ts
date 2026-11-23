@@ -7,6 +7,7 @@ import { requireStoreById, requireUser } from "@/lib/auth";
 import { orderSchema, customerSchema, type OrderInput } from "@/lib/schemas";
 import { submitOrder as submitTx, cancelOrder as cancelTx, approveHold as approveTx, UserError } from "@/lib/orders";
 import { audit } from "@/lib/audit";
+import { createDraftOrder } from "@/lib/orderCreate";
 
 export type ActionResult = { error?: string; ok?: string; id?: string };
 
@@ -26,44 +27,7 @@ export async function createOrder(input: OrderInput): Promise<ActionResult> {
   try {
     const data = orderSchema.parse(input);
     const { user, store } = await requireStoreById(data.storeId);
-    if (!data.customerId && !data.customer) return { error: "Choose or enter a customer." };
-    if (data.items.length !== new Set(data.items.map((i) => i.productId)).size) return { error: "Each product can appear only once." };
-
-    const products = await db.product.findMany({ where: { id: { in: data.items.map((i) => i.productId) }, active: true } });
-    if (products.length !== data.items.length) return { error: "Some products are unavailable." };
-    const price = new Map(products.map((p) => [p.id, p.basePriceCents]));
-
-    const orderId = await db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "Store" WHERE id = ${store.id} FOR UPDATE`;
-      const customer = data.customerId
-        ? await tx.customer.findFirst({ where: { id: data.customerId, storeId: store.id } })
-        : await tx.customer.upsert({
-            where: { storeId_email: { storeId: store.id, email: data.customer!.email } },
-            create: { ...data.customer!, storeId: store.id },
-            update: {},
-          });
-      if (!customer) throw new UserError("Customer not found.");
-      const { nextOrderNumber } = await tx.store.update({ where: { id: store.id }, data: { nextOrderNumber: { increment: 1 } } });
-      const order = await tx.order.create({
-        data: {
-          storeId: store.id,
-          number: nextOrderNumber - 1,
-          customerId: customer.id,
-          externalRef: data.externalRef,
-          notes: data.notes,
-          shipName: customer.name,
-          shipLine1: customer.line1,
-          shipLine2: customer.line2,
-          shipCity: customer.city,
-          shipRegion: customer.region,
-          shipPostalCode: customer.postalCode,
-          shipCountry: customer.country,
-          items: { create: data.items.map((i) => ({ productId: i.productId, qty: i.qty, unitPriceCents: price.get(i.productId)! })) },
-        },
-      });
-      await audit(tx, user.id, "order.create", "Order", order.id);
-      return order.id;
-    });
+    const orderId = await createDraftOrder(store.id, user.id, data);
 
     if (data.submit) {
       try {

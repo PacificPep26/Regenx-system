@@ -6,7 +6,7 @@ import { Tabs } from "@/components/Tabs";
 
 export default async function StoreLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { store, canSeeMoney, isAdmin } = await requireStore(slug);
+  const { user, store, canSeeMoney, isAdmin } = await requireStore(slug);
   const b = await getBalances(store.id);
   const base = `/s/${slug}`;
   const tabs: [string, string][] = [
@@ -14,6 +14,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
     [`${base}/orders`, "Orders"],
     [`${base}/customers`, "Customers"],
     [`${base}/chat`, "Chat"],
+    ...(user.role !== "FULFILLMENT" ? ([[`${base}/plan`, "Plan"]] as [string, string][]) : []),
     ...(canSeeMoney ? ([[`${base}/reports`, "Reports"], [`${base}/ledger`, "Ledger"], [`${base}/statements`, "Statements"]] as [string, string][]) : []),
     ...(isAdmin ? ([[`${base}/settings`, "Settings"]] as [string, string][]) : []),
   ];

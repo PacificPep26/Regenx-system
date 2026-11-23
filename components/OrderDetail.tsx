@@ -42,7 +42,7 @@ export function OrderDetail({ o, showMoney, customerHref, actions, showLedger }:
               <li key={i.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                 <div className="min-w-0">
                   <div className="font-medium">{i.product.name} <span className="text-gray-500">{i.product.strength}</span></div>
-                  <div className="text-xs text-gray-400">{i.product.sku}{i.product.sourceCode ? ` · ${i.product.sourceCode}` : ""}</div>
+                  <div className="text-xs text-gray-400">{i.product.sku}{i.product.sourceCode ? ` · ${i.product.sourceCode}` : ""}{i.product.upc ? ` · UPC ${i.product.upc}` : ""}</div>
                 </div>
                 <div className="shrink-0 text-right">
                   <div>× {i.qty}</div>

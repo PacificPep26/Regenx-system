@@ -118,8 +118,14 @@ run("order + ledger flow (db)", async () => {
     expect((await db.statement.findUniqueOrThrow({ where: { id: st.id } })).status).toBe("PAID");
   });
 
-  it("overdue statement blocks new orders", async () => {
+  it("overdue statement only blocks fulfillment beyond credit; orders within credit still go through", async () => {
     await db.statement.updateMany({ where: { storeId }, data: { status: "OVERDUE" } });
-    await expect(submitOrder(await draft(1), actor)).rejects.toThrow(/overdue/);
+    const bal = await getBalances(storeId);
+    expect(bal.CREDIT).toBeGreaterThan(10_000);
+    expect(await submitOrder(await draft(1), actor)).toBe("APPROVED"); // within credit
+    // drain credit so the next order would exceed it
+    await db.ledgerEntry.create({ data: { storeId, bucket: "CREDIT", type: "ADJUSTMENT", amountCents: 5_000 - (await getBalances(storeId)).CREDIT } });
+    await expect(submitOrder(await draft(1), actor)).rejects.toThrow(/overdue/); // needs $95 > $50 credit
+    expect((await getBalances(storeId)).OUTSTANDING).toBe(0); // nothing was recorded
   });
 });

@@ -103,6 +103,13 @@ Other behaviors worth knowing:
 - After a Prisma schema change stop the dev server before `prisma generate` (Windows locks the engine DLL), then clear `.next` and restart. Running `pnpm build` in the same folder as a running dev server corrupts the dev cache (stale pages/hydration errors): restart dev after building.
 - Docker Desktop must be running for Postgres (`docker compose up -d`).
 
+### Program features added after the first pass
+- **Overdue rule**: `submitOrder` only refuses when the order needs credit beyond the balance *and* the store has an OVERDUE statement (program text: RegenX may limit *additional* fulfillment).
+- **Premium order API** `lib/apiKeys.ts`, `app/api/v1/orders[/id]`: Bearer `rxk_…` keys (SHA-256 stored, shown once, max 5 active per store, 60 req/min/key), idempotent on `externalRef` (409), 201 submitted / 202 saved as draft / 422 invalid. Shared creation core: `lib/orderCreate.ts` (used by the web form and the API). `middleware.ts` must keep `api/v1` and `api/cron` out of the cookie-login redirect.
+- **Plan tab** `/s/[slug]/plan`: tier perks, labeling notes, insurance status (Premium can request; admin sets status in store Settings), API keys.
+- **Product UPC + documentation links** (admin Catalog), **store labelNotes** shown on the GP packing slip, UPC in pick-list CSV, Premium **Priority** badge and ordering in GP queue and Inbox.
+- Open items: statement emails need `RESEND_API_KEY` + `STATEMENT_FROM_EMAIL` on the web service; confirm whether the price list is the *standard* price the 5%/10% applies to.
+
 ## 6. UI rules (user's explicit preferences)
 
 White-dominant, **red (`#c8102e`) and navy (`#1b2a41`) accents**, flat with **no border radius** (global `* { border-radius: 0 !important }`), minimal helper text, **mobile-first**, Notion-like organization (sidebar per store, table/board, full filters and search on every list). Use in-app modals (`components/Dialog.tsx` `useDialog`), **never** `window.confirm/prompt/alert`. Icons: lucide-react only. Shared classes (`btn`, `btn-primary`, `btn-danger`, `input`, `label`, `panel`, `th`, `td`) are Tailwind v4 `@utility` blocks in `app/globals.css`.
@@ -141,4 +148,4 @@ Pages were smoke-tested over HTTP per role (including partner isolation 404s) wi
 - Variables on web: `DATABASE_URL` (reference to Postgres, with `?connection_limit=10`), `SESSION_SECRET`, `CRON_SECRET`, `APP_URL`, `NODE_ENV`. `RESEND_API_KEY` / `STATEMENT_FROM_EMAIL` are optional (statement and reset emails). Build config: `railway.json` + `packageManager` (pnpm 12) + `engines.node >= 22` (Railpack's default pnpm 9 cannot read this repo).
 - Start command is set on the service (`pnpm prisma migrate deploy && pnpm start`); `railway.json`'s startCommand was not honoured, so migrations run through the service setting.
 - Postgres has no public TCP proxy: run one-off tasks inside the container, e.g. `railway ssh --service web -- sh -c 'cd /app && pnpm prisma migrate status'`. Quoting through ssh is fragile: for scripts pipe base64 into node. Create the first admin with `ADMIN_EMAIL=... ADMIN_PASSWORD=... pnpm db:admin` the same way; seed the catalog with `SEED_DEMO=0 pnpm prisma db seed`.
-- **Weekly statements** (`/api/cron/weekly-statements`, Bearer `CRON_SECRET`) are scheduled by `vercel.json`, which does nothing on Railway: add a Railway cron service (or any scheduler) that calls that URL every Monday 11:00 UTC.
+- **Weekly statements**: Railway service `statements-cron` (image alpine, cron `0 11 * * 1`, `wget` with `CRON_SECRET`/`APP_URL` referenced from web). `vercel.json` is unused on Railway.

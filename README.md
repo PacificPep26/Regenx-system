@@ -36,6 +36,14 @@ Demo logins (password `ChangeMe123!`, change after first login):
 - Payments are applied in this order: outstanding, then shipping, then credit.
 - A Monday cron (`/api/cron/weekly-statements`, `vercel.json`) closes the previous Mon–Sun week in New York time and issues statements. Statements past due become `OVERDUE`, which blocks new orders.
 
+## Program rules (RegenXLabs partnership terms)
+
+- Starter $10,000 / 5% and Premium $50,000 / 10%; credit is deducted at submit; shipping is billed separately.
+- Orders above available credit are held for admin approval and the excess is an *outstanding* balance, paid separately from replenishment.
+- With an **overdue** statement only fulfillment *beyond* the prepaid credit is paused; orders within credit still go through.
+- Weekly statements run **every Monday 11:00 UTC** from a Railway cron service (`statements-cron`) calling `/api/cron/weekly-statements` with `CRON_SECRET`.
+- Premium extras: order/tracking **REST API** (`/api/v1/orders`, key per store in the store's **Plan** tab), priority queue/inbox, insurance request. Per product: UPC and documentation links (admin Catalog). Per store: branding/labeling instructions shown to GP.
+
 ## Tests
 
 ```bash

@@ -29,8 +29,7 @@ export function submitOrder(orderId: string, actor: Actor) {
     const store = order.store;
     if (order.status !== "DRAFT") throw new UserError("Only draft orders can be submitted.");
     if (store.status !== "ACTIVE") throw new UserError("Store is not active.");
-    const overdue = await tx.statement.count({ where: { storeId: store.id, status: "OVERDUE" } });
-    if (overdue) throw new UserError("Ordering is paused: this store has an overdue statement.");
+    const overdue = (await tx.statement.count({ where: { storeId: store.id, status: "OVERDUE" } })) > 0;
     if (!regionAllowed(store.allowedRegions, order.shipCountry, order.shipRegion))
       throw new UserError(`Shipping to ${order.shipCountry}-${order.shipRegion} is not authorized for this store.`);
     for (const i of order.items) {
@@ -48,6 +47,10 @@ export function submitOrder(orderId: string, actor: Actor) {
     );
     const bal = await getBalances(store.id, { tx });
     const { creditAppliedCents, overageCents } = splitCharge(bal.CREDIT, totalCents);
+    // Program rule: with an unsettled statement RegenX may limit *additional* fulfillment (beyond the prepaid credit);
+    // orders fully covered by credit still go through.
+    if (overdue && overageCents > 0)
+      throw new UserError("Additional fulfillment beyond your credit is paused: this store has an overdue statement. Orders within your available credit are still accepted.");
 
     if (creditAppliedCents > 0)
       await tx.ledgerEntry.create({

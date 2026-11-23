@@ -30,9 +30,10 @@ export default async function GpDashboard({ searchParams }: { searchParams: Prom
     db.order.count({ where: { ...open, approvedAt: { lte: new Date(now - 48 * H) } } }),
     db.order.findMany({
       where: open,
-      orderBy: { approvedAt: "asc" },
+      // priority support: Premium stores first, then oldest first
+      orderBy: [{ store: { tier: "desc" } }, { approvedAt: "asc" }],
       take: TOP,
-      select: { id: true, number: true, status: true, approvedAt: true, shipRegion: true, store: { select: { name: true } }, _count: { select: { items: true } } },
+      select: { id: true, number: true, status: true, approvedAt: true, shipRegion: true, store: { select: { name: true, tier: true } }, _count: { select: { items: true } } },
     }),
     db.order.count({ where: { status: "SHIPPED", shippedAt: { lt: new Date(now - 10 * 24 * H) }, ...storeFilter } }),
     db.order.findMany({ where: { status: "SHIPPED", shippedAt: { lt: new Date(now - 10 * 24 * H) }, ...storeFilter }, orderBy: { shippedAt: "asc" }, take: 8, select: { id: true, number: true, carrier: true, trackingNo: true, store: { select: { name: true } } } }),
@@ -98,7 +99,7 @@ export default async function GpDashboard({ searchParams }: { searchParams: Prom
 
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="label mb-0">Open queue · oldest first{openTotal > TOP ? ` · ${TOP} of ${openTotal}` : ""}</h2>
+          <h2 className="label mb-0">Open queue · Premium first, then oldest{openTotal > TOP ? ` · ${TOP} of ${openTotal}` : ""}</h2>
           {openTotal > TOP && <Link href="/fulfillment?status=APPROVED,PACKING&view=table" className="text-sm text-navy underline">All {openTotal}</Link>}
         </div>
         {queue.length ? (
@@ -108,7 +109,7 @@ export default async function GpDashboard({ searchParams }: { searchParams: Prom
               return (
                 <li key={o.id}>
                   <Link href={`/fulfillment/${o.id}`} className={`flex items-center justify-between gap-2 border-l-4 p-3 text-sm hover:bg-hover ${h > 48 ? "border-red" : h > 24 ? "border-warn" : "border-transparent"}`}>
-                    <span className="min-w-0 truncate"><b className="text-navy">{o.store.name} #{o.number}</b> · {o._count.items} item(s) · {o.shipRegion}</span>
+                    <span className="min-w-0 truncate"><b className="text-navy">{o.store.name} #{o.number}</b>{o.store.tier === "PREMIUM" && <span className="ml-1 border border-red px-1 text-[9px] font-bold uppercase text-red">Priority</span>} · {o._count.items} item(s) · {o.shipRegion}</span>
                     <span className="flex shrink-0 items-center gap-2"><Badge value={o.status} /><span className={`tabular-nums ${h > 48 ? "font-bold text-red" : ""}`}>{Math.floor(h)}h</span></span>
                   </Link>
                 </li>

@@ -23,7 +23,7 @@ export default async function OrdersPage({ params, searchParams }: { params: Pro
     db.order.findMany({ where, orderBy: orderSort(sp), select: orderSelect, skip: board ? 0 : skip, take: board ? 300 : take }),
     db.order.count({ where }),
     viewsFor(user.id, "orders", store.id),
-    newOrderCounts(user, [store.id]),
+    newOrderCounts(user),
   ]);
   const href = (o: { id: string }) => `/s/${slug}/orders/${o.id}`;
 

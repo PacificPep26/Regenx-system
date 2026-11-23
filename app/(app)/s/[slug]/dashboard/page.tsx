@@ -11,7 +11,6 @@ import { Badge, Empty, Money, Pager, fmtDate } from "@/components/ui";
 import { orderSelect } from "@/components/OrderViews";
 
 const LIVE = { notIn: ["DRAFT", "CANCELLED"] as ("DRAFT" | "CANCELLED")[] };
-const PENDING = ["ON_HOLD", "APPROVED", "PACKING"];
 const STATUSES = ["ON_HOLD", "APPROVED", "PACKING", "SHIPPED", "DELIVERED"] as const;
 const DAY = 86400000;
 

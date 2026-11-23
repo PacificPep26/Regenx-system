@@ -70,6 +70,12 @@ export default async function StoreSettings({ params }: { params: Promise<{ slug
               <select name="status" defaultValue={store.status} className="input"><option>PENDING</option><option>ACTIVE</option><option>SUSPENDED</option></select>
             </div>
             <div><label className="label">Allowed regions</label><input name="regions" defaultValue={store.allowedRegions.join(", ")} className="input" placeholder="US, CA, VN or US-TX, US-CA" /></div>
+            <div className="sm:col-span-2"><label className="label">Branding / UPC labeling instructions (shown to GP)</label><textarea name="labelNotes" defaultValue={store.labelNotes ?? ""} rows={3} className="input h-auto py-2" /></div>
+            <div>
+              <label className="label">Insurance (Premium)</label>
+              <select name="insuranceStatus" defaultValue={store.insuranceStatus} className="input"><option value="NONE">Not requested</option><option value="REQUESTED">Requested</option><option value="ACTIVE">Active</option></select>
+            </div>
+            <div><label className="label">Insurance note</label><input name="insuranceNote" defaultValue={store.insuranceNote ?? ""} className="input" placeholder="e.g. additional insured per policy #..." /></div>
             <div className="sm:col-span-2"><label className="label">Logo URL</label><input name="brandingLogoUrl" defaultValue={store.brandingLogoUrl ?? ""} className="input" /></div>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="allowRestricted" defaultChecked={store.allowRestricted} className="h-4 w-4" /> Cleared for restricted SKUs</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="hideAmountsFromStaff" defaultChecked={store.hideAmountsFromStaff} className="h-4 w-4" /> Hide $ from staff</label>

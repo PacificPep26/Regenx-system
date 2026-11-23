@@ -28,7 +28,14 @@ export default async function FulfillmentOrder({ params }: { params: Promise<{ i
           <img src={o.store.brandingLogoUrl} alt="" className="h-10 w-auto" />
         )}
         <div className="font-bold text-navy">{o.store.name}</div>
+        {o.store.tier === "PREMIUM" && <span className="border border-red px-1.5 text-[10px] font-bold uppercase text-red">Priority</span>}
       </div>
+      {o.store.labelNotes && (
+        <section className="mb-3 border-l-4 border-navy bg-white p-3 text-sm">
+          <h3 className="label">Branding / labeling instructions</h3>
+          <p className="whitespace-pre-wrap">{o.store.labelNotes}</p>
+        </section>
+      )}
       {check.length > 0 && o.status !== "SHIPPED" && o.status !== "DELIVERED" && o.status !== "CANCELLED" && (
         <section className={`mb-3 border p-3 text-sm print:hidden ${blocked ? "border-red bg-red/5" : "border-line bg-white"}`}>
           <h3 className="label">Stock check{blocked ? " · cannot ship yet" : " · ready"}</h3>

@@ -6,7 +6,7 @@ import type { CurrentUser } from "./auth";
  * New orders per store since this user last opened that store's Orders page, in a single query.
  * Admin: newly submitted orders. GP: newly approved (ready to pack). Partners: none (they create them).
  */
-export async function newOrderCounts(u: CurrentUser, _storeIds?: string[]) {
+export async function newOrderCounts(u: CurrentUser) {
   const out = new Map<string, number>();
   if (u.role !== "ADMIN" && u.role !== "FULFILLMENT") return out;
   const col = Prisma.raw(u.role === "ADMIN" ? '"submittedAt"' : '"approvedAt"');

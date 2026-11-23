@@ -36,7 +36,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
 
   const { page, skip, take } = pageOf(sp, 50);
   const [rows, count] = await Promise.all([
-    db.product.findMany({ where, orderBy: [sortOf(sp, ["name", "basePriceCents", "sku"] as const, "name_asc"), { basePriceCents: "asc" }], skip, take }),
+    db.product.findMany({ where, orderBy: [sortOf(sp, ["name", "basePriceCents", "sku"] as const, "name_asc"), { basePriceCents: "asc" }], skip, take, include: { docs: { orderBy: { createdAt: "asc" } } } }),
     db.product.count({ where }),
   ]);
 
@@ -75,9 +75,9 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             <tbody>
               {rows.map((p) => (
                 <tr key={p.id} className="hover:bg-hover">
-                  <td className="td">{p.name}{p.restricted && <span className="ml-1 border border-red px-1 text-[10px] text-red">RESTRICTED</span>}<div className="text-xs text-gray-400 sm:hidden">{p.sku}</div></td>
+                  <td className="td">{p.name}{p.restricted && <span className="ml-1 border border-red px-1 text-[10px] text-red">RESTRICTED</span>}<div className="text-xs text-gray-400 sm:hidden">{p.sku}</div>{p.docs.length > 0 && <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs">{p.docs.map((d) => <a key={d.id} href={d.url} target="_blank" rel="noopener noreferrer" className="text-navy underline">{d.title}</a>)}</div>}</td>
                   <td className="td whitespace-nowrap">{p.strength}</td>
-                  <td className="td hidden text-xs text-gray-500 sm:table-cell">{p.sku}{p.sourceCode ? ` · ${p.sourceCode}` : ""}</td>
+                  <td className="td hidden text-xs text-gray-500 sm:table-cell">{p.sku}{p.sourceCode ? ` · ${p.sourceCode}` : ""}{p.upc ? ` · UPC ${p.upc}` : ""}</td>
                   {showMoney && <td className="td text-right font-semibold"><Money cents={Math.round((p.basePriceCents * (10000 - discountBps)) / 10000)} /></td>}
                 </tr>
               ))}

@@ -20,13 +20,13 @@ export async function GET(req: Request) {
     ...(store ? { store: { OR: [{ slug: { contains: store, mode: "insensitive" as const } }, { name: { contains: store, mode: "insensitive" as const } }] } } : {}),
   };
   const groups = await db.orderItem.groupBy({ by: ["productId"], where: { order: orderWhere }, _sum: { qty: true }, _count: { orderId: true }, orderBy: { _sum: { qty: "desc" } } });
-  const products = await db.product.findMany({ where: { id: { in: groups.map((g) => g.productId) } }, select: { id: true, sku: true, sourceCode: true, name: true, strength: true } });
+  const products = await db.product.findMany({ where: { id: { in: groups.map((g) => g.productId) } }, select: { id: true, sku: true, sourceCode: true, upc: true, name: true, strength: true } });
   const pm = new Map(products.map((p) => [p.id, p]));
   const lines = groups.map((g) => {
     const p = pm.get(g.productId);
-    return [p?.sku, p?.sourceCode, p?.name, p?.strength, g._count.orderId, g._sum.qty ?? 0].map(esc).join(",");
+    return [p?.sku, p?.sourceCode, p?.upc, p?.name, p?.strength, g._count.orderId, g._sum.qty ?? 0].map(esc).join(",");
   });
-  return new NextResponse("﻿" + ["sku,source_code,product,strength,orders,units", ...lines].join("\n"), {
+  return new NextResponse("﻿" + ["sku,source_code,upc,product,strength,orders,units", ...lines].join("\n"), {
     headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="pick-list-${new Date().toISOString().slice(0, 10)}.csv"` },
   });
 }

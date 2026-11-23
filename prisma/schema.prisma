@@ -59,24 +59,29 @@ enum StatementStatus {
 }
 
 model Store {
-  id                   String      @id @default(cuid())
+  id                   String          @id @default(cuid())
   name                 String
-  slug                 String      @unique
+  slug                 String          @unique
   tier                 Tier
   requiredBalanceCents Int
   discountBps          Int
-  status               StoreStatus @default(PENDING)
+  status               StoreStatus     @default(PENDING)
   brandingLogoUrl      String?
   /// ISO country or "US-XX" state codes; empty = no destination allowed
   allowedRegions       String[]
-  allowRestricted      Boolean     @default(false)
-  hideAmountsFromStaff Boolean     @default(false)
-  nextOrderNumber      Int         @default(1001)
+  allowRestricted      Boolean         @default(false)
+  hideAmountsFromStaff Boolean         @default(false)
+  nextOrderNumber      Int             @default(1001)
+  /// approved partner branding / labeling instructions shown to GP on the packing slip
+  labelNotes           String?
+  insuranceStatus      InsuranceStatus @default(NONE)
+  insuranceNote        String?
+  apiKeys              ApiKey[]
   /// maintained by triggers from LedgerEntry; never write directly
-  creditCents          Int         @default(0)
-  outstandingCents     Int         @default(0)
-  shippingCents        Int         @default(0)
-  createdAt            DateTime    @default(now())
+  creditCents          Int             @default(0)
+  outstandingCents     Int             @default(0)
+  shippingCents        Int             @default(0)
+  createdAt            DateTime        @default(now())
 
   users         User[]
   customers     Customer[]
@@ -123,6 +128,8 @@ model Product {
   notes          String?
   /// stock is only enforced (ship needs enough on hand) for tracked products
   trackStock     Boolean @default(false)
+  /// UPC/barcode printed on the label (program: UPC labeling)
+  upc            String?
   /// maintained by triggers from StockMovement; never write directly
   onHand         Int     @default(0)
   reserved       Int     @default(0)
@@ -130,6 +137,7 @@ model Product {
 
   items OrderItem[]
   stock StockMovement[]
+  docs  ProductDoc[]
 }
 
 model Customer {
@@ -383,4 +391,37 @@ model StockMovement {
 
   @@index([productId, createdAt])
   @@index([orderId])
+}
+
+enum InsuranceStatus {
+  NONE
+  REQUESTED
+  ACTIVE
+}
+
+/// Product documentation (COA, spec sheets): links managed by admin, visible to partners and GP
+model ProductDoc {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title     String
+  url       String
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+/// Premium order/tracking integration. Only the SHA-256 of the key is stored; the key is shown once on creation.
+model ApiKey {
+  id         String    @id @default(cuid())
+  storeId    String
+  store      Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name       String
+  prefix     String
+  keyHash    String    @unique
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([storeId])
 }

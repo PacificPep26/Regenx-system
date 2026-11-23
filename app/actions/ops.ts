@@ -171,6 +171,9 @@ export async function updateStore(_: OpsState, form: FormData): Promise<OpsState
       allowRestricted: z.string().optional(),
       hideAmountsFromStaff: z.string().optional(),
       brandingLogoUrl: z.string().trim().url().or(z.literal("")).optional(),
+      labelNotes: z.string().trim().max(2000).optional(),
+      insuranceStatus: z.enum(["NONE", "REQUESTED", "ACTIVE"]).default("NONE"),
+      insuranceNote: z.string().trim().max(300).optional(),
     })
     .safeParse(Object.fromEntries(form));
   if (!p.success) return { error: p.error.issues[0].message };
@@ -187,6 +190,9 @@ export async function updateStore(_: OpsState, form: FormData): Promise<OpsState
         allowRestricted: d.allowRestricted === "on",
         hideAmountsFromStaff: d.hideAmountsFromStaff === "on",
         brandingLogoUrl: d.brandingLogoUrl || null,
+        labelNotes: d.labelNotes || null,
+        insuranceStatus: d.tier === "PREMIUM" ? d.insuranceStatus : "NONE",
+        insuranceNote: d.insuranceNote || null,
       },
     });
     await audit(tx, u.id, "store.update", "Store", d.storeId, d);
@@ -238,6 +244,7 @@ const productFields = {
   name: z.string().trim().min(2, "Name is required").max(100),
   strength: z.string().trim().min(1, "Strength is required").max(30),
   sourceCode: z.string().trim().max(40).optional().transform((v) => v || null),
+  upc: z.string().trim().regex(/^\d{8,14}$/, "UPC must be 8 to 14 digits").or(z.literal("")).optional().transform((v) => v || null),
   price: money,
   active: z.string().optional(),
   restricted: z.string().optional(),
@@ -257,6 +264,7 @@ export async function updateProduct(_: OpsState, form: FormData): Promise<OpsSta
       name: p.name,
       strength: p.strength,
       sourceCode: p.sourceCode,
+      upc: p.upc,
       basePriceCents: p.price,
       active: p.active === "on",
       restricted: p.restricted === "on",
@@ -286,8 +294,25 @@ export async function createProduct(_: OpsState, form: FormData): Promise<OpsSta
     let sku = base;
     for (let n = 2; await db.product.findUnique({ where: { sku } }); n++) sku = `${base}-${String.fromCharCode(63 + n)}`; // -B, -C...
     const created = await db.product.create({
-      data: { sku, name: p.name, strength: p.strength, sourceCode: p.sourceCode, basePriceCents: p.price, active: p.active === "on", restricted: p.restricted === "on", notes: p.notes },
+      data: { sku, name: p.name, strength: p.strength, sourceCode: p.sourceCode, upc: p.upc, basePriceCents: p.price, active: p.active === "on", restricted: p.restricted === "on", notes: p.notes },
     });
     await audit(db, u.id, "product.create", "Product", created.id, { sku, price: p.price });
   }, "Product added.", ["/catalog"]);
+}
+
+export async function addProductDoc(_: OpsState, form: FormData): Promise<OpsState> {
+  const u = await requireRole("ADMIN");
+  return run(async () => {
+    const d = z.object({ productId: z.string(), title: z.string().trim().min(2, "Title is required").max(100), url: z.string().trim().url("Enter a full link (https://…)").max(500) }).parse(Object.fromEntries(form));
+    if (!/^https:\/\//i.test(d.url)) throw new UserError("Links must use https.");
+    await db.productDoc.create({ data: d });
+    await audit(db, u.id, "product.doc_add", "Product", d.productId, { title: d.title });
+  }, "Document added.", ["/catalog"]);
+}
+
+export async function deleteProductDoc(id: string) {
+  const u = await requireRole("ADMIN");
+  const d = await db.productDoc.delete({ where: { id } });
+  await audit(db, u.id, "product.doc_delete", "Product", d.productId, { title: d.title });
+  revalidatePath("/catalog");
 }

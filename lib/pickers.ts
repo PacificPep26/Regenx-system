@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { stockLevels, stockStatus, emptyLevel } from "./stock";
+import { stockStatus } from "./stock";
 
 /** productId -> number of this store's submitted orders that included it (drafts and cancelled excluded). */
 export async function popularProducts(storeId: string): Promise<Record<string, number>> {

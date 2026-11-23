@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { unreadCounts } from "@/lib/notify";
 import { newOrderCounts } from "@/lib/newOrders";
@@ -17,8 +16,7 @@ export async function GET() {
   const hit = cache.get(u.id);
   if (hit && Date.now() - hit.at < TTL) return NextResponse.json(hit.body);
   if (cache.size > 5000) cache.clear();
-  const ids = u.role === "ADMIN" || u.role === "FULFILLMENT" ? (await db.store.findMany({ select: { id: true } })).map((s) => s.id) : [];
-  const fresh = await newOrderCounts(u, ids);
+  const fresh = await newOrderCounts(u);
   const body = { ...(await unreadCounts(u)), newOrders: Object.fromEntries(fresh) };
   cache.set(u.id, { at: Date.now(), body });
   return NextResponse.json(body);
