@@ -10,15 +10,20 @@ export default async function StoreLayout({ children, params }: { children: Reac
   const { user, store, canSeeMoney, isAdmin } = await requireStore(slug);
   const b = await getBalances(store.id);
   const base = `/s/${slug}`;
-  const tabs: [string, string][] = [
+  const tabs: ([string, string] | [string, string, string[]])[] = [
     [`${base}/dashboard`, "Dashboard"],
     [`${base}/orders`, "Orders"],
     [`${base}/customers`, "Customers"],
     [`${base}/chat`, "Chat"],
-    ...(user.role !== "FULFILLMENT" ? ([[`${base}/plan`, "Plan"]] as [string, string][]) : []),
-    ...(canSeeMoney ? ([[`${base}/reports`, "Reports"], [`${base}/ledger`, "Ledger"], [`${base}/statements`, "Statements"]] as [string, string][]) : []),
+  ];
+  // money pages live under one "Account" tab with a small second row
+  const accountTabs: [string, string][] = [
+    ...(canSeeMoney ? ([[`${base}/ledger`, "Balance"], [`${base}/statements`, "Statements"], [`${base}/reports`, "Reports"]] as [string, string][]) : []),
+    ...(user.role !== "FULFILLMENT" ? ([[`${base}/plan`, "Plan & API"]] as [string, string][]) : []),
     ...(isAdmin ? ([[`${base}/settings`, "Settings"]] as [string, string][]) : []),
   ];
+  const accountHrefs = accountTabs.map(([h]) => h);
+  if (accountTabs.length) tabs.push([accountHrefs[0], "Account", accountHrefs]);
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -33,6 +38,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
       </div>
       {canSeeMoney && <StoreBalanceStrip credit={b.CREDIT} required={store.requiredBalanceCents} outstanding={b.OUTSTANDING} shipping={b.SHIPPING} />}
       <Tabs tabs={tabs} />
+      {accountTabs.length > 1 && <Tabs tabs={accountTabs} onlyIn={accountHrefs} />}
       {children}
     </div>
   );

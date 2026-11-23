@@ -71,16 +71,16 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
   // frequent items stay on top; rarely-needed admin pages are grouped under "Manage" at the bottom
   const primary: Item[] =
     role === "ADMIN"
-      ? [["/overview", "Overview", LayoutDashboard], ["/inbox", "Inbox", Inbox], ["/fulfillment", "Fulfillment", Truck], ["/stock", "Stock", Boxes], ["/reports", "Reports", BarChart3], ["/gp", "GP dashboard", Gauge], ["/search", "Search", Search]]
+      ? [["/overview", "Home", LayoutDashboard], ["/fulfillment", "Orders to ship", Truck], ["/inbox", "Messages", Inbox], ["/reports", "Reports", BarChart3]]
       : role === "FULFILLMENT"
-        ? [["/gp", "Dashboard", Gauge], ["/inbox", "Inbox", Inbox], ["/fulfillment", "Fulfillment", Truck], ["/stock", "Stock", Boxes], ["/search", "Search", Search]]
-        : [["/catalog", "Price list", Package], ["/search", "Search", Search]];
+        ? [["/gp", "Home", Gauge], ["/fulfillment", "Orders to ship", Truck], ["/inbox", "Messages", Inbox]]
+        : [["/catalog", "Price list", Package]];
   const manage: Item[] =
     role === "ADMIN"
-      ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/users", "Users", ShieldCheck], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package]]
+      ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/stock", "Stock", Boxes], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package], ["/users", "Users", ShieldCheck], ["/gp", "Warehouse view", Gauge], ["/search", "Search", Search]]
       : role === "FULFILLMENT"
-        ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/catalog", "Catalog", Package]]
-        : [];
+        ? [["/stock", "Stock", Boxes], ["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/catalog", "Catalog", Package], ["/search", "Search", Search]]
+        : [["/search", "Search", Search]];
   const [storeQ, setStoreQ] = useState("");
   const shownStores = stores.filter((x) => x.name.toLowerCase().includes(storeQ.trim().toLowerCase()));
   const storeAlerts = stores.reduce((n, x) => n + (live.newOrders?.[x.id] ?? x.newOrders) + ((live.chatByStore[x.id] ?? 0) > 0 ? 1 : 0), 0);
@@ -175,7 +175,7 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
           {manage.length > 0 && (
             <details key={manageActive ? "open" : "closed"} open={manageActive} className="group">
               <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 hover:bg-hover [&::-webkit-details-marker]:hidden">
-                Manage
+                More
                 <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
               </summary>
               {manage.map((it) => link(it))}
