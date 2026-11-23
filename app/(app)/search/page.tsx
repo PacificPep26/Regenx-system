@@ -14,7 +14,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const q = str(sp, "q");
   const partner = isPartner(u);
   const storeScope = partner ? { storeId: u.storeId ?? "-" } : {};
-  const showMoney = u.role !== "FULFILLMENT" && !(u.role === "PARTNER_STAFF" && u.store?.hideAmountsFromStaff);
+  const showMoney = !(u.role === "PARTNER_STAFF" && u.store?.hideAmountsFromStaff);
   const c = q ? { contains: q, mode: "insensitive" as const } : undefined;
 
   const [orders, customers, products, stores] = q

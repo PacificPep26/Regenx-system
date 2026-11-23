@@ -39,8 +39,11 @@ export async function requireStore(slug: string) {
   if (!store) notFound();
   if (isPartner(user) && user.storeId !== store.id) notFound();
   const isOps = user.role === "FULFILLMENT";
-  const canSeeMoney = !isOps && !(user.role === "PARTNER_STAFF" && store.hideAmountsFromStaff);
-  return { user, store, canSeeMoney, canEdit: !isOps, isAdmin: user.role === "ADMIN" };
+  const staffHidden = user.role === "PARTNER_STAFF" && store.hideAmountsFromStaff;
+  // canSeePrices: prices and totals on orders/products (GP needs them). canSeeMoney: the store's account (deposit, ledger, statements).
+  const canSeePrices = !staffHidden;
+  const canSeeMoney = !isOps && !staffHidden;
+  return { user, store, canSeeMoney, canSeePrices, canEdit: !isOps, isAdmin: user.role === "ADMIN" };
 }
 
 /** For server actions that receive a storeId from the client: verify instead of trusting it.

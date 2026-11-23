@@ -10,7 +10,7 @@ import { Money, fmtDate } from "@/components/ui";
 
 export default async function CustomerPage({ params }: { params: Promise<{ slug: string; id: string }> }) {
   const { slug, id } = await params;
-  const { store, canSeeMoney, canEdit } = await requireStore(slug);
+  const { store, canSeePrices, canEdit } = await requireStore(slug);
   const c = await db.customer.findUnique({ where: { id } });
   if (!c || c.storeId !== store.id) notFound();
   const [orders, agg] = await Promise.all([
@@ -30,7 +30,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ slug:
       <h2 className="text-lg font-bold text-navy">{c.name}</h2>
       <div className="grid grid-cols-3 gap-2">
         <div className="panel border-l-4 border-navy p-3"><div className="label">Orders</div><div className="text-lg font-bold">{agg._count}</div></div>
-        <div className="panel border-l-4 border-navy p-3"><div className="label">Wholesale</div><div className="text-lg font-bold"><Money cents={agg._sum.totalCents ?? 0} show={canSeeMoney} /></div></div>
+        <div className="panel border-l-4 border-navy p-3"><div className="label">Wholesale</div><div className="text-lg font-bold"><Money cents={agg._sum.totalCents ?? 0} show={canSeePrices} /></div></div>
         <div className="panel border-l-4 border-navy p-3"><div className="label">Last order</div><div className="text-sm font-bold">{fmtDate(agg._max.createdAt)}</div></div>
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -67,7 +67,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ slug:
         </section>
         <section>
           <h3 className="label mb-2">Order history</h3>
-          <OrderTable rows={orders} href={(o) => `${base}/orders/${o.id}`} showMoney={canSeeMoney} />
+          <OrderTable rows={orders} href={(o) => `${base}/orders/${o.id}`} showMoney={canSeePrices} />
         </section>
       </div>
     </div>

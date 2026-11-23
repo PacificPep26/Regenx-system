@@ -19,7 +19,7 @@ const DAY = 86400000;
 export default async function StoreDashboard({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<SP> }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const { store, canSeeMoney, canEdit } = await requireStore(slug);
+  const { store, canSeeMoney, canSeePrices, canEdit } = await requireStore(slug);
   const now = Date.now();
   const range = dateRange(sp, "from", "to");
   const q = str(sp, "q")?.toLowerCase();
@@ -136,7 +136,7 @@ export default async function StoreDashboard({ params, searchParams }: { params:
                 <li key={o.id}>
                   <Link href={`${base}/orders/${o.id}`} className="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-hover">
                     <span className="min-w-0 truncate"><b className="text-navy">#{o.number}</b> {o.customer.name}</span>
-                    <span className="flex shrink-0 items-center gap-2"><Badge value={o.status} />{canSeeMoney && <Money cents={o.totalCents} className="text-xs" />}</span>
+                    <span className="flex shrink-0 items-center gap-2"><Badge value={o.status} />{canSeePrices && <Money cents={o.totalCents} className="text-xs" />}</span>
                   </Link>
                 </li>
               ))}

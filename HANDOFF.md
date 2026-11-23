@@ -22,7 +22,7 @@ Source catalog: `Individual_Vial_Pricing.pdf` (10 pages, about 313 SKUs, USD per
 | Role | Can | Cannot |
 |---|---|---|
 | `ADMIN` | Everything: stores, users, catalog, payments, adjustments, approve overage holds, statements, CSV export | n/a |
-| `FULFILLMENT` (GP) | GP dashboard, fulfillment queue, read-only view of every store's orders and customers, chat and inbox, cross-store customers list (no money) | Any money, creating or editing orders and customers, settings, ledger |
+| `FULFILLMENT` (GP) | GP dashboard, fulfillment queue, read-only view of every store's orders and customers, chat and inbox, cross-store customers list. **Sees prices and totals on orders** (`canSeePrices`) | A store's account money (deposit balance, ledger, statements, reports), creating or editing orders and customers, settings |
 | `PARTNER_OWNER` | Own store only: customers, orders, CSV import, chat, ledger, statements | Anything outside their store |
 | `PARTNER_STAFF` | Same as owner, but cannot cancel submitted orders and can be blocked from seeing $ (`Store.hideAmountsFromStaff`) | |
 

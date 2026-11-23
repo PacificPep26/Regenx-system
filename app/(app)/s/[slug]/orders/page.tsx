@@ -15,7 +15,7 @@ import { MarkOrdersSeen } from "@/components/MarkOrdersSeen";
 export default async function OrdersPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<SP> }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const { user, store, canSeeMoney, canEdit } = await requireStore(slug);
+  const { user, store, canSeePrices, canEdit } = await requireStore(slug);
   const where = orderWhere(sp, { storeId: store.id });
   const board = str(sp, "view") === "board";
   const { page, skip, take } = pageOf(sp);
@@ -39,7 +39,7 @@ export default async function OrdersPage({ params, searchParams }: { params: Pro
           { type: "multi", key: "status", label: "Status", options: statusOptions },
           { type: "date", from: "from", to: "to", label: "Created" },
           { type: "date", from: "sfrom", to: "sto", label: "Shipped" },
-          ...(canSeeMoney ? [{ type: "range" as const, min: "min", max: "max", label: "Total" }] : []),
+          ...(canSeePrices ? [{ type: "range" as const, min: "min", max: "max", label: "Total" }] : []),
           { type: "select", key: "region", label: "Ship state", options: US_STATES.map((s) => ({ value: s, label: s })) },
           { type: "select", key: "tracking", label: "Tracking", options: [{ value: "yes", label: "Has tracking" }, { value: "no", label: "No tracking" }] },
           { type: "select", key: "sort", label: "Sort", options: SORT_OPTIONS },
@@ -54,10 +54,10 @@ export default async function OrdersPage({ params, searchParams }: { params: Pro
       />
       <div className="mb-2 text-xs text-gray-500">{count} order(s)</div>
       {board ? (
-        <OrderBoard rows={rows} href={href} showMoney={canSeeMoney} />
+        <OrderBoard rows={rows} href={href} showMoney={canSeePrices} />
       ) : (
         <>
-          <OrderTable rows={rows} href={href} showMoney={canSeeMoney} />
+          <OrderTable rows={rows} href={href} showMoney={canSeePrices} />
           <Pager page={page} pages={Math.ceil(count / take)} params={flat(sp)} />
         </>
       )}

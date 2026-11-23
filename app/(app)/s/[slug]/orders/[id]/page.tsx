@@ -8,7 +8,7 @@ import { OrderActions } from "@/components/OrderActions";
 export default async function OrderPage({ params, searchParams }: { params: Promise<{ slug: string; id: string }>; searchParams: Promise<{ err?: string }> }) {
   const { slug, id } = await params;
   const { err } = await searchParams;
-  const { user, store, canSeeMoney } = await requireStore(slug);
+  const { user, store, canSeePrices, canSeeMoney } = await requireStore(slug);
   const o = await loadOrder(id);
   if (!o || o.storeId !== store.id) notFound();
   const base = `/s/${slug}`;
@@ -21,8 +21,8 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
       {err && <p role="alert" className="mb-3 border-l-4 border-red bg-red/5 px-3 py-2 text-sm text-red">Saved as draft, not submitted: {err}</p>}
       <OrderDetail
         o={o}
-        showMoney={canSeeMoney}
-        showLedger
+        showMoney={canSeePrices}
+        showLedger={canSeeMoney}
         customerHref={`${base}/customers/${o.customerId}`}
         actions={<OrderActions orderId={o.id} status={o.status} role={user.role} editHref={`${base}/orders/${o.id}/edit`} listHref={`${base}/orders`} />}
       />
