@@ -2,6 +2,7 @@ import { requireStore } from "@/lib/auth";
 import { getBalances } from "@/lib/balances";
 import { Badge } from "@/components/ui";
 import { StoreBalanceStrip } from "@/components/StoreBalanceStrip";
+import { AddFunds } from "@/components/AddFunds";
 import { Tabs } from "@/components/Tabs";
 
 export default async function StoreLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
@@ -24,6 +25,11 @@ export default async function StoreLayout({ children, params }: { children: Reac
         <h1 className="text-lg font-bold text-navy md:text-xl">{store.name}</h1>
         <Badge value={store.tier} />
         {store.status !== "ACTIVE" && <Badge value={store.status} />}
+        {isAdmin && (
+          <div className="ml-auto">
+            <AddFunds storeId={store.id} storeName={store.name} required={store.requiredBalanceCents} credit={b.CREDIT} outstanding={b.OUTSTANDING} shipping={b.SHIPPING} status={store.status} />
+          </div>
+        )}
       </div>
       {canSeeMoney && <StoreBalanceStrip credit={b.CREDIT} required={store.requiredBalanceCents} outstanding={b.OUTSTANDING} shipping={b.SHIPPING} />}
       <Tabs tabs={tabs} />

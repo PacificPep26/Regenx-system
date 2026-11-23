@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireStore } from "@/lib/auth";
 import { ActionForm } from "@/components/ActionForm";
-import { addPayment, addAdjustment, updateStore, inviteUser } from "@/app/actions/ops";
+import { addAdjustment, updateStore, inviteUser } from "@/app/actions/ops";
 import { UserToggle } from "./UserToggle";
 import { Money, fmtDate } from "@/components/ui";
 
@@ -18,19 +18,8 @@ export default async function StoreSettings({ params }: { params: Promise<{ slug
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <section className="panel p-3 md:p-4">
-        <h2 className="label mb-3">Record payment</h2>
-        <ActionForm action={addPayment} submit="Record payment">
-          <input type="hidden" name="storeId" value={store.id} />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div><label className="label">Amount ($)</label><input name="amount" required inputMode="decimal" className="input" /></div>
-            <div>
-              <label className="label">Method</label>
-              <select name="method" className="input">{["WIRE", "ACH", "CHECK", "CARD", "OTHER"].map((m) => <option key={m}>{m}</option>)}</select>
-            </div>
-            <div><label className="label">Reference</label><input name="reference" className="input" /></div>
-          </div>
-          <p className="text-xs text-gray-500">Applied to outstanding → shipping → credit.</p>
-        </ActionForm>
+        <h2 className="label mb-1">Payments</h2>
+        <p className="mb-3 text-xs text-gray-500">To add money, use <b>+ Add funds</b> at the top of this store (it shows where the money goes).</p>
         {payments.length > 0 && (
           <ul className="mt-4 divide-y divide-line border border-line text-sm">
             {payments.map((p) => (
@@ -41,7 +30,9 @@ export default async function StoreSettings({ params }: { params: Promise<{ slug
       </section>
 
       <section className="panel p-3 md:p-4">
-        <h2 className="label mb-3">Ledger adjustment</h2>
+        <details>
+          <summary className="label mb-0 cursor-pointer">Ledger adjustment (advanced, ± correction)</summary>
+          <div className="mt-3">
         <ActionForm action={addAdjustment} submit="Post adjustment" danger>
           <input type="hidden" name="storeId" value={store.id} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -53,6 +44,8 @@ export default async function StoreSettings({ params }: { params: Promise<{ slug
             <div><label className="label">Memo *</label><input name="memo" required className="input" /></div>
           </div>
         </ActionForm>
+          </div>
+        </details>
       </section>
 
       <section className="panel p-3 md:p-4">

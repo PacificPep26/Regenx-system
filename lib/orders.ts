@@ -183,6 +183,12 @@ export function recordPayment(storeId: string, actor: Actor, p: { amountCents: n
     if (a.creditCents) await tx.ledgerEntry.create({ data: { ...base, bucket: "CREDIT", amountCents: a.creditCents } });
     await settleStatements(tx, storeId);
     await notify(tx, { audience: "STORE", storeId, title: `Payment received ${formatUSD(p.amountCents)}`, body: p.reference });
+    const store = await tx.store.findUniqueOrThrow({ where: { id: storeId } });
+    if (store.status === "PENDING" && bal.CREDIT + a.creditCents >= store.requiredBalanceCents) {
+      await tx.store.update({ where: { id: storeId }, data: { status: "ACTIVE" } });
+      await notify(tx, { audience: "STORE", storeId, title: "Your partner account is active. You can start ordering.", link: `/s/${store.slug}/dashboard` });
+      await audit(tx, actor.id, "store.activated", "Store", storeId);
+    }
     await audit(tx, actor.id, "payment.record", "Store", storeId, { ...p, allocation: a });
     return a;
   });
