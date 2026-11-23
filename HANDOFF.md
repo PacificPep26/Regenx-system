@@ -15,7 +15,7 @@ Program rules (from the original brief):
 - Shipping is paid by the partner and never reduces credit.
 - Shipping destinations must be legally authorized. Everything is subject to regulatory approval.
 
-Source catalog: `Individual_Vial_Pricing.pdf` (10 pages, about 313 SKUs, USD per vial). Transcribed into `prisma/seed/products.csv`.
+Source catalog: `Individual_Vial_Pricing.pdf` (10 pages, about 313 SKUs, USD per vial). Transcribed into `prisma/seed/products.csv`. **These price files are confidential: gitignored, never commit them** (the repo is public); `seed.ts` falls back to `products.example.csv` when the real file is absent. Production was seeded from the real file.
 
 ## 2. Roles
 

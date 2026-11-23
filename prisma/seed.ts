@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import Papa from "papaparse";
 import bcrypt from "bcryptjs";
@@ -20,7 +20,11 @@ const slug = (s: string) =>
 type Row = { sourceCode: string; name: string; strength: string; price: string };
 
 async function seedProducts() {
-  const csv = readFileSync(path.join(__dirname, "seed/products.csv"), "utf8");
+  // The real wholesale price list is confidential and kept out of git; fall back to harmless sample rows.
+  const real = path.join(__dirname, "seed/products.csv");
+  const file = existsSync(real) ? real : path.join(__dirname, "seed/products.example.csv");
+  if (file !== real) console.warn("prisma/seed/products.csv not found: seeding SAMPLE products only");
+  const csv = readFileSync(file, "utf8");
   const { data, errors } = Papa.parse<Row>(csv, { header: true, skipEmptyLines: true });
   if (errors.length) throw new Error(`CSV parse errors: ${JSON.stringify(errors.slice(0, 3))}`);
 

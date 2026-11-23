@@ -41,3 +41,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .audit/
+
+# confidential wholesale price data + generated reports (never commit)
+/Individual_Vial_Pricing.pdf
+/RegenX_Order_Flow_User_Guide.pdf
+/prisma/seed/products.csv
+/prisma/seed/duplicates-report.csv
