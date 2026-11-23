@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RegenX Partner Hub
 
-## Getting Started
+Central order and prepaid-credit management for RegenXLabs distribution partners (stores), GP fulfillment and RegenX admin.
 
-First, run the development server:
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+docker compose up -d                 # Postgres on localhost:5434
+cp .env.example .env                 # then set SESSION_SECRET / CRON_SECRET
+pnpm install
+pnpm prisma migrate deploy
+pnpm db:seed                         # 313 SKUs from the PDF + demo users (SEED_DEMO=0 to skip demo)
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Demo logins (password `ChangeMe123!`, change after first login):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Email | Role |
+|---|---|
+| admin@regenx.local | Admin (RegenX) |
+| gp@regenx.local | GP Fulfillment manager |
+| alpha@partner.local | Owner, Alpha Peptides (Starter) |
+| beta@partner.local | Owner, Beta Wellness (Premium) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Roles
 
-## Learn More
+- **Admin**: everything: stores, users, catalog prices, payments, adjustments, overage approval, statements.
+- **GP (FULFILLMENT)**: GP dashboard (queue, aging/SLA, pick list, per-store order inventory), fulfillment board, read-only view of every store's orders and customers, chat with stores. Never sees money.
+- **Partner owner / staff**: only their own store: customers, orders (form or CSV), chat, ledger, statements. Staff can be blocked from seeing $ per store.
 
-To learn more about Next.js, take a look at the following resources:
+## Money rules (`lib/ledger.ts`, `lib/orders.ts`)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Amounts are integer cents in an append-only `LedgerEntry` table with three buckets: `CREDIT` (prepaid), `OUTSTANDING` (overage owed), `SHIPPING` (owed). Balance = sum of entries.
+- Submit re-prices from the catalog, applies the tier discount (5% / 10%) and locks the store row, so concurrent orders cannot overspend. Any amount over credit goes to `OUTSTANDING` and the order is put `ON_HOLD` until an admin approves it.
+- Shipping fees are billed to `SHIPPING` and never reduce credit.
+- Payments are applied in this order: outstanding, then shipping, then credit.
+- A Monday cron (`/api/cron/weekly-statements`, `vercel.json`) closes the previous Mon–Sun week in New York time and issues statements. Statements past due become `OVERDUE`, which blocks new orders.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Tests
 
-## Deploy on Vercel
+```bash
+pnpm test                                                       # unit tests (money rules)
+TEST_DATABASE_URL=postgresql://regenx:regenx@localhost:5434/regenx_test pnpm test   # + DB integration
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Create the test DB once: `docker compose exec db psql -U regenx -c "CREATE DATABASE regenx_test;"`, then run `DATABASE_URL=<test url> pnpm prisma migrate deploy`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Catalog data
+
+`prisma/seed/products.csv` is transcribed from `Individual_Vial_Pricing.pdf`. The source has shared, missing and conflicting item codes. `prisma/seed/duplicates-report.csv` lists them for review. SKUs are generated (`NAME-STRENGTH`, with `-B` added on collision), and the original code is kept as `sourceCode`. Rx/controlled-looking items are flagged `restricted` by default. Review these flags in Catalog; the flags are a control, not legal advice.

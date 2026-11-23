@@ -1,0 +1,386 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  FULFILLMENT
+  PARTNER_OWNER
+  PARTNER_STAFF
+}
+
+enum Tier {
+  STARTER
+  PREMIUM
+}
+
+enum StoreStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum OrderStatus {
+  DRAFT
+  ON_HOLD
+  APPROVED
+  PACKING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum Bucket {
+  CREDIT
+  OUTSTANDING
+  SHIPPING
+}
+
+enum LedgerType {
+  DEPOSIT
+  ORDER_DEBIT
+  ORDER_REFUND
+  OVERAGE
+  OVERAGE_REVERSAL
+  SHIPPING_CHARGE
+  PAYMENT
+  ADJUSTMENT
+}
+
+enum StatementStatus {
+  ISSUED
+  PAID
+  OVERDUE
+}
+
+model Store {
+  id                   String      @id @default(cuid())
+  name                 String
+  slug                 String      @unique
+  tier                 Tier
+  requiredBalanceCents Int
+  discountBps          Int
+  status               StoreStatus @default(PENDING)
+  brandingLogoUrl      String?
+  /// ISO country or "US-XX" state codes; empty = no destination allowed
+  allowedRegions       String[]
+  allowRestricted      Boolean     @default(false)
+  hideAmountsFromStaff Boolean     @default(false)
+  nextOrderNumber      Int         @default(1001)
+  /// maintained by triggers from LedgerEntry; never write directly
+  creditCents          Int         @default(0)
+  outstandingCents     Int         @default(0)
+  shippingCents        Int         @default(0)
+  createdAt            DateTime    @default(now())
+
+  users         User[]
+  customers     Customer[]
+  orders        Order[]
+  ledger        LedgerEntry[]
+  payments      Payment[]
+  statements    Statement[]
+  messages      Message[]
+  notifications Notification[]
+  chatReads     ChatRead[]
+  storeSeen     StoreSeen[]
+  resets        PasswordReset[]
+}
+
+model User {
+  id                  String   @id @default(cuid())
+  email               String   @unique
+  name                String
+  passwordHash        String
+  sessionVersion      Int      @default(0)
+  active              Boolean  @default(true)
+  role                Role
+  storeId             String?
+  store               Store?   @relation(fields: [storeId], references: [id])
+  createdAt           DateTime @default(now())
+  notificationsSeenAt DateTime @default(now())
+
+  views          SavedView[]
+  messages       Message[]
+  chatReads      ChatRead[]
+  storeSeen      StoreSeen[]
+  passwordResets PasswordReset[]
+}
+
+model Product {
+  id             String  @id @default(cuid())
+  sku            String  @unique
+  sourceCode     String?
+  name           String
+  strength       String
+  basePriceCents Int
+  active         Boolean @default(true)
+  restricted     Boolean @default(false)
+  notes          String?
+  /// stock is only enforced (ship needs enough on hand) for tracked products
+  trackStock     Boolean @default(false)
+  /// maintained by triggers from StockMovement; never write directly
+  onHand         Int     @default(0)
+  reserved       Int     @default(0)
+  reorderLevel   Int     @default(0)
+
+  items OrderItem[]
+  stock StockMovement[]
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id])
+  name       String
+  email      String
+  phone      String?
+  line1      String
+  line2      String?
+  city       String
+  region     String
+  postalCode String
+  country    String   @default("US")
+  company    String?
+  notes      String?
+  tags       String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  orders Order[]
+
+  @@unique([storeId, email])
+  @@index([storeId, createdAt])
+  @@index([createdAt])
+}
+
+model Order {
+  id                 String      @id @default(cuid())
+  storeId            String
+  store              Store       @relation(fields: [storeId], references: [id])
+  number             Int
+  externalRef        String?
+  customerId         String
+  customer           Customer    @relation(fields: [customerId], references: [id])
+  status             OrderStatus @default(DRAFT)
+  shipName           String
+  shipLine1          String
+  shipLine2          String?
+  shipCity           String
+  shipRegion         String
+  shipPostalCode     String
+  shipCountry        String
+  subtotalCents      Int         @default(0)
+  discountBps        Int         @default(0)
+  totalCents         Int         @default(0)
+  creditAppliedCents Int         @default(0)
+  overageCents       Int         @default(0)
+  shippingFeeCents   Int?
+  carrier            String?
+  trackingNo         String?
+  notes              String?
+  createdAt          DateTime    @default(now())
+  submittedAt        DateTime?
+  approvedAt         DateTime?
+  shippedAt          DateTime?
+  deliveredAt        DateTime?
+  cancelledAt        DateTime?
+
+  items    OrderItem[]
+  ledger   LedgerEntry[]
+  messages Message[]
+
+  @@unique([storeId, number])
+  @@index([status])
+  @@index([storeId, createdAt])
+  @@index([storeId, status])
+  @@index([status, approvedAt])
+  @@index([submittedAt])
+  @@index([approvedAt])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product @relation(fields: [productId], references: [id])
+  qty            Int
+  unitPriceCents Int
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model LedgerEntry {
+  id          String     @id @default(cuid())
+  storeId     String
+  store       Store      @relation(fields: [storeId], references: [id])
+  bucket      Bucket
+  type        LedgerType
+  /// signed: + increases the bucket balance
+  amountCents Int
+  orderId     String?
+  order       Order?     @relation(fields: [orderId], references: [id])
+  paymentId   String?
+  payment     Payment?   @relation(fields: [paymentId], references: [id])
+  memo        String?
+  createdById String?
+  createdAt   DateTime   @default(now())
+
+  @@index([storeId, bucket])
+  @@index([orderId])
+  @@index([storeId, createdAt])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id])
+  amountCents Int
+  method      String
+  reference   String?
+  receivedAt  DateTime @default(now())
+  createdById String?
+
+  ledger LedgerEntry[]
+}
+
+model Statement {
+  id                  String          @id @default(cuid())
+  storeId             String
+  store               Store           @relation(fields: [storeId], references: [id])
+  periodStart         DateTime
+  periodEnd           DateTime
+  openingCreditCents  Int
+  debitsCents         Int
+  closingCreditCents  Int
+  replenishDueCents   Int
+  outstandingDueCents Int
+  shippingDueCents    Int
+  dueAt               DateTime
+  status              StatementStatus @default(ISSUED)
+  createdAt           DateTime        @default(now())
+
+  @@unique([storeId, periodStart])
+}
+
+model SavedView {
+  id       String  @id @default(cuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  database String
+  storeId  String?
+  name     String
+  config   Json
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String
+  data      Json?
+  createdAt DateTime @default(now())
+}
+
+enum Audience {
+  STORE
+  ADMIN
+  FULFILLMENT
+}
+
+/// One chat channel per store (store team <-> RegenX); optionally tagged to an order
+model Message {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id])
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([storeId, createdAt])
+}
+
+model ChatRead {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id])
+  lastReadAt DateTime
+
+  @@id([userId, storeId])
+}
+
+/// Audience STORE = that store's partner users; ADMIN / FULFILLMENT = all users of that role
+model Notification {
+  id        String   @id @default(cuid())
+  audience  Audience
+  storeId   String?
+  store     Store?   @relation(fields: [storeId], references: [id])
+  title     String
+  body      String?
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@index([audience, storeId, createdAt])
+  @@index([audience, createdAt])
+}
+
+/// Last time a user opened a store's Orders; drives the "new orders" badge in the sidebar
+model StoreSeen {
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeId      String
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ordersSeenAt DateTime
+
+  @@id([userId, storeId])
+}
+
+/// One-time reset link; only the SHA-256 of the token is stored
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  store     Store?    @relation(fields: [storeId], references: [id])
+  storeId   String?
+}
+
+enum StockType {
+  RECEIPT
+  ADJUST
+  RESERVE
+  RELEASE
+  SHIP
+}
+
+/// Append-only stock journal at GP. on hand = SUM(onHandDelta); reserved = SUM(reservedDelta); available = on hand - reserved
+model StockMovement {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  type          StockType
+  onHandDelta   Int       @default(0)
+  reservedDelta Int       @default(0)
+  orderId       String?
+  memo          String?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+
+  @@index([productId, createdAt])
+  @@index([orderId])
+}

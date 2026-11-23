@@ -1,0 +1,20 @@
+// Dev tool: AS=email node --env-file=.env scripts/shot.mjs <path> <out.png> [width height]
+import { chromium } from "playwright-core";
+import { SignJWT } from "jose";
+import { PrismaClient } from "@prisma/client";
+const [path, out, w = "1280", h = "900"] = process.argv.slice(2);
+const db = new PrismaClient();
+const u = await db.user.findUniqueOrThrow({ where: { email: process.env.AS ?? "alpha@partner.local" } });
+const token = await new SignJWT({ uid: u.id, v: u.sessionVersion }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("10m").sign(new TextEncoder().encode(process.env.SESSION_SECRET));
+const browser = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+const ctx = await browser.newContext({ viewport: { width: +w, height: +h }, deviceScaleFactor: 1, isMobile: +w < 500 });
+await ctx.addCookies([{ name: "rx_session", value: token, url: "http://localhost:3100" }]);
+const page = await ctx.newPage();
+const errs = [];
+page.on("pageerror", (e) => errs.push(e.message));
+page.on("console", (m) => m.type() === "error" && errs.push(m.text()));
+await page.goto("http://localhost:3100" + path, { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+await page.screenshot({ path: out, fullPage: true });
+console.log("errors:", errs.length, errs[0]?.slice(0, 200) ?? "");
+await browser.close(); await db.$disconnect();

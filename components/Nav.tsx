@@ -1,0 +1,182 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import type { Role } from "@prisma/client";
+import {
+  Bell, Menu, X, LayoutDashboard, Gauge, Inbox, Truck, Store, FileText, Package, Search,
+  ShoppingCart, Users, Contact, Boxes, BarChart3, ShieldCheck, MessageSquare, BookOpen, Settings, UserRound, LogOut, type LucideIcon,
+} from "lucide-react";
+import { logout } from "@/app/actions/auth";
+import { NotificationBell } from "./NotificationBell";
+import type { Unread } from "@/lib/notify";
+
+export type NavStore = { id: string; slug: string; name: string; health: "green" | "yellow" | "red" | "grey"; showMoney: boolean; newOrders: number };
+
+const DOT = { green: "bg-ok", yellow: "bg-warn", red: "bg-red", grey: "bg-gray-300" };
+type Item = [href: string, label: string, icon: LucideIcon];
+
+export function Nav({ role, userName, stores, totalStores = stores.length, unread }: { role: Role; userName: string; stores: NavStore[]; totalStores?: number; unread: Unread }) {
+  const [open, setOpen] = useState(false);
+  const path = usePathname();
+  const [live, setLive] = useState<Unread & { newOrders?: Record<string, number> }>(unread);
+  const [toast, setToast] = useState<{ title: string; link: string | null } | null>(null);
+  const seenLatest = useRef(unread.latest?.id);
+  const livePath = useRef(path);
+  livePath.current = path;
+
+  // a server render (navigation / refresh) is the freshest truth; adopt it
+  useEffect(() => {
+    setLive(unread);
+    seenLatest.current = unread.latest?.id;
+  }, [unread]);
+
+  useEffect(() => {
+    let stop = false;
+    const poll = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const r = await fetch("/api/unread", { cache: "no-store" });
+        if (!r.ok || stop) return;
+        const d: Unread & { newOrders: Record<string, number> } = await r.json();
+        setLive(d);
+        if (d.latest && d.latest.id !== seenLatest.current) {
+          seenLatest.current = d.latest.id;
+          // no toast for what the user is already looking at (e.g. the open chat)
+          if (d.notifications > 0 && d.latest.link !== livePath.current) setToast({ title: d.latest.title, link: d.latest.link });
+        }
+      } catch {
+        /* offline: keep last numbers */
+      }
+    };
+    const t = setInterval(poll, 8000);
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      stop = true;
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", poll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 7000);
+    return () => clearTimeout(t);
+  }, [toast]);
+  useEffect(() => {
+    setOpen(false);
+  }, [path]);
+
+  const top: Item[] =
+    role === "ADMIN"
+      ? [["/overview", "Overview", LayoutDashboard], ["/reports", "Reports", BarChart3], ["/gp", "GP dashboard", Gauge], ["/inbox", "Inbox", Inbox], ["/fulfillment", "Fulfillment", Truck], ["/stock", "Stock", Boxes], ["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/users", "Users", ShieldCheck], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package], ["/search", "Search", Search]]
+      : role === "FULFILLMENT"
+        ? [["/gp", "Dashboard", Gauge], ["/inbox", "Inbox", Inbox], ["/fulfillment", "Fulfillment", Truck], ["/stock", "Stock", Boxes], ["/customers", "Customers", Contact], ["/catalog", "Catalog", Package], ["/search", "Search", Search]]
+        : [["/catalog", "Price list", Package], ["/search", "Search", Search]];
+
+  const link = ([href, label, Icon]: Item, indent = false, count = 0) => {
+    const active = path === href || (href !== "/" && path.startsWith(href + "/"));
+    return (
+      <Link
+        key={href}
+        href={href}
+        className={`flex items-center gap-2.5 border-l-4 py-2 pr-3 text-sm ${indent ? "pl-8" : "pl-4"} ${
+          active ? "border-red bg-soft font-semibold text-navy" : "border-transparent text-gray-700 hover:bg-hover"
+        }`}
+      >
+        <Icon size={16} strokeWidth={1.75} className="shrink-0" />
+        <span className="flex-1">{label}</span>
+        {count > 0 && <span className="bg-red px-1.5 text-[11px] font-bold text-white">{count}</span>}
+      </Link>
+    );
+  };
+  const bell = <NotificationBell unread={live.notifications} />;
+
+  return (
+    <>
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b-2 border-red bg-white px-4 print:hidden md:hidden">
+        <Link href="/" className="font-bold tracking-wide text-navy">REGENX</Link>
+        <div className="flex gap-2">
+          {bell}
+          <button className="btn h-9 w-9 px-0" aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {open ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </div>
+      </header>
+      {open && <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setOpen(false)} />}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col overflow-y-auto border-r border-line bg-white transition-transform print:hidden md:sticky md:top-0 md:h-dvh md:w-60 md:translate-x-0 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between border-b-2 border-red px-4 py-4">
+          <div>
+            <div className="font-bold tracking-wide text-navy">REGENX LABS</div>
+            <div className="text-xs text-gray-500">Partner Hub</div>
+          </div>
+          <div className="hidden md:block">{bell}</div>
+        </div>
+        <nav className="py-2">
+          {top.map((it) => link(it, false, it[0] === "/inbox" ? live.chat : 0))}
+          {stores.length > 0 && <div className="mt-3 px-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Stores</div>}
+          {stores.map((s) => {
+            const base = `/s/${s.slug}`;
+            const inStore = path.startsWith(base + "/") || path === base;
+            return (
+              <div key={s.slug}>
+                <Link href={`${base}/dashboard`} className={`flex items-center gap-2 py-2 pl-4 pr-3 text-sm ${inStore ? "font-semibold text-navy" : "text-gray-700 hover:bg-hover"}`}>
+                  <span className={`h-2.5 w-2.5 shrink-0 ${DOT[s.health]}`} />
+                  <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                  {(live.chatByStore[s.id] ?? 0) > 0 && <MessageSquare size={12} className="shrink-0 text-red" aria-label="unread chat" />}
+                  {(live.newOrders?.[s.id] ?? s.newOrders) > 0 && (
+                    <span className="flex items-center gap-0.5 bg-red px-1.5 text-[11px] font-bold text-white" title={`${live.newOrders?.[s.id] ?? s.newOrders} new order(s)`}>
+                      <Bell size={10} strokeWidth={2.5} />
+                      {live.newOrders?.[s.id] ?? s.newOrders}
+                    </span>
+                  )}
+                </Link>
+                {(inStore || stores.length === 1) && (
+                  <div>
+                    {link([`${base}/dashboard`, "Dashboard", LayoutDashboard], true)}
+                    {link([`${base}/orders`, "Orders", ShoppingCart], true)}
+                    {link([`${base}/customers`, "Customers", Users], true)}
+                    {link([`${base}/chat`, "Chat", MessageSquare], true, live.chatByStore[s.id] ?? 0)}
+                    {s.showMoney && link([`${base}/ledger`, "Ledger", BookOpen], true)}
+                    {s.showMoney && link([`${base}/statements`, "Statements", FileText], true)}
+                    {role === "ADMIN" && link([`${base}/settings`, "Settings", Settings], true)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {(role === "ADMIN" || role === "FULFILLMENT") && totalStores > stores.length && (
+            <Link href="/stores" className="block px-4 py-2 text-sm font-medium text-navy hover:bg-hover">All stores ({totalStores}) →</Link>
+          )}
+        </nav>
+        <div className="mt-auto border-t border-line py-2">
+          <div className="px-4 py-1 text-xs text-gray-500">{userName} · {role.replace("_", " ").toLowerCase()}</div>
+          {link(["/account", "Account", UserRound])}
+          <form action={logout}>
+            <button className="flex w-full items-center gap-2.5 py-2 pl-5 text-left text-sm text-red hover:bg-hover">
+              <LogOut size={16} strokeWidth={1.75} /> Sign out
+            </button>
+          </form>
+        </div>
+      </aside>
+      {toast && (
+        <div role="status" className="fixed right-3 top-16 z-[70] w-[calc(100vw-1.5rem)] max-w-sm border border-line border-l-4 border-l-red bg-white p-3 shadow-lg md:top-3">
+          <div className="flex items-start gap-2">
+            <Bell size={16} className="mt-0.5 shrink-0 text-red" />
+            {toast.link ? (
+              <Link href={toast.link} onClick={() => setToast(null)} className="flex-1 text-sm font-medium text-navy hover:underline">{toast.title}</Link>
+            ) : (
+              <span className="flex-1 text-sm font-medium text-navy">{toast.title}</span>
+            )}
+            <button className="shrink-0 text-gray-400 hover:text-navy" aria-label="Dismiss" onClick={() => setToast(null)}><X size={14} /></button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
