@@ -11,7 +11,7 @@ const TOP = 8; // every list here is a bounded "top N" with a link to the full, 
 export default async function Overview() {
   await requireRole("ADMIN");
   const weekAgo = new Date(Date.now() - 7 * 86400000);
-  const [totalsAgg, storeCount, attention, holdCount, holds, queue, overdueCount, overdue, week] = await Promise.all([
+  const [totalsAgg, storeCount, attention, holdCount, holds, queue, overdueCount, overdue, week, late, lowStock] = await Promise.all([
     db.store.aggregate({ _sum: { creditCents: true, outstandingCents: true, shippingCents: true } }),
     db.store.count(),
     // stores that most need a look: owe the most, then have the least credit
@@ -22,6 +22,8 @@ export default async function Overview() {
     db.statement.count({ where: { status: "OVERDUE" } }),
     db.statement.findMany({ where: { status: "OVERDUE" }, include: { store: { select: { name: true, slug: true } } }, orderBy: { dueAt: "asc" }, take: TOP }),
     db.order.aggregate({ where: { submittedAt: { gte: weekAgo }, status: { notIn: ["DRAFT", "CANCELLED"] } }, _sum: { totalCents: true }, _count: true }),
+    db.order.count({ where: { status: { in: ["APPROVED", "PACKING"] }, approvedAt: { lte: new Date(Date.now() - 48 * 3600_000) } } }),
+    db.$queryRaw<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM "Product" WHERE "trackStock" AND active AND ("onHand" - "reserved") <= "reorderLevel"`,
   ]);
   const totals = { credit: totalsAgg._sum.creditCents ?? 0, out: totalsAgg._sum.outstandingCents ?? 0, ship: totalsAgg._sum.shippingCents ?? 0 };
   const q = Object.fromEntries(queue.map((g) => [g.status, g._count]));
@@ -36,10 +38,12 @@ export default async function Overview() {
         <Stat label="Outstanding" cents={totals.out} tone={totals.out > 0 ? "red" : "navy"} />
         <Stat label="Shipping due" cents={totals.ship} tone={totals.ship > 0 ? "red" : "navy"} />
       </div>
-      <div className="grid grid-cols-3 gap-2 text-center">
+      <div className="grid grid-cols-2 gap-2 text-center md:grid-cols-5">
         <Link href="/fulfillment?status=APPROVED" className="panel border-t-4 border-t-navy p-3"><div className="text-2xl font-bold">{q.APPROVED ?? 0}</div><div className="label">To pack</div></Link>
         <Link href="/fulfillment?status=PACKING" className="panel border-t-4 border-t-navy p-3"><div className="text-2xl font-bold">{q.PACKING ?? 0}</div><div className="label">Packing</div></Link>
         <a href="#holds" className="panel border-t-4 border-t-red p-3"><div className="text-2xl font-bold text-red">{holdCount}</div><div className="label">On hold</div></a>
+        <Link href="/gp" className={`panel border-t-4 p-3 ${late ? "border-t-red" : "border-t-navy"}`}><div className={`text-2xl font-bold ${late ? "text-red" : ""}`}>{late}</div><div className="label">Late &gt; 48h</div></Link>
+        <Link href="/stock?status=low" className={`panel border-t-4 p-3 ${lowStock[0]?.n ? "border-t-red" : "border-t-navy"}`}><div className={`text-2xl font-bold ${lowStock[0]?.n ? "text-red" : ""}`}>{lowStock[0]?.n ?? 0}</div><div className="label">Low stock</div></Link>
       </div>
 
       <section>
