@@ -133,3 +133,12 @@ Pages were smoke-tested over HTTP per role (including partner isolation 404s) wi
 - Chat is polling, not realtime. Statement PDF is browser print. Email only through Resend if configured.
 - No UI to edit Store `requiredBalance`/discount independently of tier; no per-store price overrides.
 - Not deployed anywhere. Only the local dev environment exists.
+
+## 10. Deployment (Railway)
+
+- Project **regenxsystem** (Railway workspace "pacificpep26's Projects"), environment `production`, services **web** (the app) and **Postgres**. Public URL: https://regenxsystem.up.railway.app (the Railway-provided domain; rename it with the GraphQL `serviceDomainUpdate` mutation, the CLI cannot).
+- The GitHub repo is **not** connected to Railway (the Railway GitHub app has no access to `PacificPep26/Regenx-system`): deploys are made from a local checkout with `railway up --service web --ci`. To get deploy-on-push, install/authorise the Railway GitHub app for that repo in the dashboard and connect the web service to it.
+- Variables on web: `DATABASE_URL` (reference to Postgres, with `?connection_limit=10`), `SESSION_SECRET`, `CRON_SECRET`, `APP_URL`, `NODE_ENV`. `RESEND_API_KEY` / `STATEMENT_FROM_EMAIL` are optional (statement and reset emails). Build config: `railway.json` + `packageManager` (pnpm 12) + `engines.node >= 22` (Railpack's default pnpm 9 cannot read this repo).
+- Start command is set on the service (`pnpm prisma migrate deploy && pnpm start`); `railway.json`'s startCommand was not honoured, so migrations run through the service setting.
+- Postgres has no public TCP proxy: run one-off tasks inside the container, e.g. `railway ssh --service web -- sh -c 'cd /app && pnpm prisma migrate status'`. Quoting through ssh is fragile: for scripts pipe base64 into node. Create the first admin with `ADMIN_EMAIL=... ADMIN_PASSWORD=... pnpm db:admin` the same way; seed the catalog with `SEED_DEMO=0 pnpm prisma db seed`.
+- **Weekly statements** (`/api/cron/weekly-statements`, Bearer `CRON_SECRET`) are scheduled by `vercel.json`, which does nothing on Railway: add a Railway cron service (or any scheduler) that calls that URL every Monday 11:00 UTC.
