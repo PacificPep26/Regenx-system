@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { Badge, Money, fmtDate } from "./ui";
+import { Badge, Money, fmtDateTime } from "./ui";
 
 export async function loadOrder(id: string) {
   return db.order.findUnique({
@@ -81,10 +81,10 @@ export function OrderDetail({ o, showMoney, customerHref, actions, showLedger }:
             )}
           </section>
           <section className="panel p-3 text-sm">
-            <h3 className="label">Timeline</h3>
+            <h3 className="label">Timeline <span className="font-normal normal-case text-gray-400">(New York time)</span></h3>
             <ul className="space-y-1">
               {STEPS.filter(([, k]) => o[k]).map(([label, k]) => (
-                <li key={k} className="flex justify-between"><span>{label}</span><span className="text-gray-500">{fmtDate(o[k])}</span></li>
+                <li key={k} className="flex justify-between"><span>{label}</span><span className="text-gray-500">{fmtDateTime(o[k])}</span></li>
               ))}
             </ul>
             {o.notes && <p className="mt-2 whitespace-pre-wrap border-t border-line pt-2 text-gray-600">{o.notes}</p>}

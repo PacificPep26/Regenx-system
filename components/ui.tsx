@@ -71,5 +71,7 @@ export function Pager({ page, pages, params }: { page: number; pages: number; pa
 export const clean = (o: Record<string, string | undefined>) =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== "")) as Record<string, string>;
 
+export const fmtDateTime = (d: Date | null | undefined) =>
+  d ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }).format(d) : "—";
 export const fmtDate = (d: Date | null | undefined) =>
   d ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" }).format(d) : "—";
