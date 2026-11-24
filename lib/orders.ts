@@ -131,7 +131,7 @@ export function startPacking(orderId: string, actor: Actor) {
   return db.$transaction(async (tx) => {
     const o = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
     if (o.status !== "APPROVED") throw new UserError("Only approved orders can be packed.");
-    await tx.order.update({ where: { id: orderId }, data: { status: "PACKING" } });
+    await tx.order.update({ where: { id: orderId }, data: { status: "PACKING", packedAt: new Date() } });
     await audit(tx, actor.id, "order.packing", "Order", orderId);
   });
 }

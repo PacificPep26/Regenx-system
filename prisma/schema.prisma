@@ -194,6 +194,7 @@ model Order {
   createdAt          DateTime    @default(now())
   submittedAt        DateTime?
   approvedAt         DateTime?
+  packedAt           DateTime?
   shippedAt          DateTime?
   deliveredAt        DateTime?
   cancelledAt        DateTime?

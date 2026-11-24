@@ -88,7 +88,7 @@ export function OrderActions({ orderId, status, role, editHref, listHref }: Prop
           </div>
         </form>
       )}
-      {shipOpen && (
+      {shipOpen && (status === "PACKING" || status === "APPROVED") && (
         <form action={shipAction} className="panel grid grid-cols-1 gap-2 p-3 sm:grid-cols-4">
           <input type="hidden" name="orderId" value={orderId} />
           <div><label className="label">Carrier</label><input name="carrier" required className="input" list="carriers" /></div>
