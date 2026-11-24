@@ -5,8 +5,9 @@ import { requireRole } from "@/lib/auth";
 import { str, type SP } from "@/lib/query";
 import { FilterBar } from "@/components/FilterBar";
 import { PrintButton } from "@/components/PrintButton";
-import { Badge, PageHeader } from "@/components/ui";
+import { Badge, Money, PageHeader } from "@/components/ui";
 
+export const GP_FEE_PER_UNIT_CENTS = 1000; // what GP earns per unit packed and shipped ($10)
 const OPEN = ["APPROVED", "PACKING"] as const;
 const H = 3600_000;
 const TOP = 15; // every list is a bounded "top N" computed in SQL, with a link/export for the full set
@@ -21,6 +22,11 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
   const storeFilter = storeQ ? { store: { OR: [{ slug: { contains: storeQ, mode: "insensitive" as const } }, { name: { contains: storeQ, mode: "insensitive" as const } }] } } : {};
   const now = Date.now();
   const dayStart = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }) + "T00:00:00-05:00");
+  const nyDate = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const monthStart = new Date(nyDate.slice(0, 8) + "01T00:00:00-05:00");
+  const weekStart = new Date(now - 7 * 24 * 3600_000);
+  const units = async (from: Date) => (await db.orderItem.aggregate({ where: { order: { status: { in: ["SHIPPED", "DELIVERED"] }, shippedAt: { gte: from }, ...storeFilter } }, _sum: { qty: true } }))._sum.qty ?? 0;
+  const [uToday, uWeek, uMonth] = await Promise.all([units(dayStart), units(weekStart), units(monthStart)]);
   const open = { status: { in: [...OPEN] }, ...storeFilter };
 
   const [byStatus, shippedToday, warn, late, queue, stuckCount, stuck, topStores, pick, pickTotal, alertCount, alerts] = await Promise.all([
@@ -69,6 +75,15 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
       <div className="print:hidden">
         <FilterBar fields={[{ type: "search", key: "store", placeholder: "Filter by store name or slug…" }]} />
       </div>
+
+      <section className="grid grid-cols-3 gap-1.5 md:gap-2">
+        {([["Today", uToday], ["Last 7 days", uWeek], ["This month", uMonth]] as const).map(([label, n]) => (
+          <div key={label} className="panel border-t-4 border-t-ok p-2 text-center md:p-3">
+            <div className="text-xl font-bold md:text-2xl"><Money cents={n * GP_FEE_PER_UNIT_CENTS} /></div>
+            <div className="label mb-0">Packing fee · {label} · {n} unit{n === 1 ? "" : "s"}</div>
+          </div>
+        ))}
+      </section>
 
       <div className="grid grid-cols-3 gap-1.5 md:grid-cols-5 md:gap-2">
         <Kpi href="/fulfillment?status=APPROVED" n={cnt.APPROVED ?? 0} label="To pack" />
