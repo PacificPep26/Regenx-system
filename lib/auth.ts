@@ -40,8 +40,8 @@ export async function requireStore(slug: string) {
   if (isPartner(user) && user.storeId !== store.id) notFound();
   const isOps = user.role === "FULFILLMENT";
   const staffHidden = user.role === "PARTNER_STAFF" && store.hideAmountsFromStaff;
-  // canSeePrices: prices and totals on orders/products (GP needs them). canSeeMoney: the store's account (deposit, ledger, statements).
-  const canSeePrices = !staffHidden;
+  // canSeePrices: prices and totals on orders/products (not GP: GP sees only its own per-unit fee). canSeeMoney: the store's account (deposit, ledger, statements).
+  const canSeePrices = !staffHidden && user.role !== "FULFILLMENT";
   const canSeeMoney = !isOps && !staffHidden;
   return { user, store, canSeeMoney, canSeePrices, canEdit: !isOps, isAdmin: user.role === "ADMIN" };
 }

@@ -5,9 +5,9 @@ import { requireRole } from "@/lib/auth";
 import { str, type SP } from "@/lib/query";
 import { FilterBar } from "@/components/FilterBar";
 import { PrintButton } from "@/components/PrintButton";
+import { GP_FEE_PER_UNIT_CENTS } from "@/lib/gpFee";
 import { Badge, Money, PageHeader } from "@/components/ui";
 
-export const GP_FEE_PER_UNIT_CENTS = 1000; // what GP earns per unit packed and shipped ($10)
 const OPEN = ["APPROVED", "PACKING"] as const;
 const H = 3600_000;
 const TOP = 15; // every list is a bounded "top N" computed in SQL, with a link/export for the full set

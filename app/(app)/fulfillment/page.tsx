@@ -46,10 +46,10 @@ export default async function FulfillmentPage({ searchParams }: { searchParams: 
       />
       <div className="mb-2 text-xs text-gray-500">{count} order(s)</div>
       {board ? (
-        <OrderBoard rows={rows} href={(o) => `/fulfillment/${o.id}`} showMoney showStore statuses={flow} />
+        <OrderBoard rows={rows} href={(o) => `/fulfillment/${o.id}`} showMoney={u.role === "ADMIN"} showStore statuses={flow} />
       ) : (
         <>
-          <OrderTable rows={rows} href={(o) => `/fulfillment/${o.id}`} showMoney showStore />
+          <OrderTable rows={rows} href={(o) => `/fulfillment/${o.id}`} showMoney={u.role === "ADMIN"} showStore />
           <Pager page={page} pages={Math.ceil(count / take)} params={flat(sp)} />
         </>
       )}

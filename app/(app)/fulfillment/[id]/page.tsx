@@ -51,7 +51,8 @@ export default async function FulfillmentOrder({ params }: { params: Promise<{ i
       )}
       <OrderDetail
         o={o}
-        showMoney
+        showMoney={u.role === "ADMIN"}
+        gpFee={u.role === "FULFILLMENT"}
         showLedger={false}
         actions={<div className="print:hidden"><OrderActions orderId={o.id} status={o.status} role={u.role} listHref="/fulfillment" /></div>}
       />

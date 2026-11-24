@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { Badge, Money, fmtDateTime } from "./ui";
+import { GP_FEE_PER_UNIT_CENTS } from "@/lib/gpFee";
 
 export async function loadOrder(id: string) {
   return db.order.findUnique({
@@ -25,7 +26,7 @@ const STEPS = [
   ["Cancelled", "cancelledAt"],
 ] as const;
 
-export function OrderDetail({ o, showMoney, customerHref, actions, showLedger }: { o: Full; showMoney: boolean; customerHref?: string; actions: React.ReactNode; showLedger: boolean }) {
+export function OrderDetail({ o, showMoney, customerHref, actions, showLedger, gpFee }: { o: Full; showMoney: boolean; gpFee?: boolean; customerHref?: string; actions: React.ReactNode; showLedger: boolean }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -50,10 +51,16 @@ export function OrderDetail({ o, showMoney, customerHref, actions, showLedger }:
                 <div className="shrink-0 text-right">
                   <div>× {i.qty}</div>
                   {showMoney && <div className="text-xs text-gray-500"><Money cents={i.unitPriceCents} /> ea</div>}
+                  {gpFee && <div className="text-xs text-gray-500"><Money cents={GP_FEE_PER_UNIT_CENTS * i.qty} /></div>}
                 </div>
               </li>
             ))}
           </ul>
+          {gpFee && (
+            <dl className="mt-2 border-t border-line pt-2 text-sm">
+              <Row k={<b>Your packing fee</b>} v={<b><Money cents={o.items.reduce((n, i) => n + i.qty, 0) * GP_FEE_PER_UNIT_CENTS} /></b>} />
+            </dl>
+          )}
           {showMoney && o.status !== "DRAFT" && (
             <dl className="mt-2 space-y-1 border-t border-line pt-2 text-sm">
               <Row k="Subtotal" v={<Money cents={o.subtotalCents} />} />

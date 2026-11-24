@@ -22,6 +22,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
       <OrderDetail
         o={o}
         showMoney={canSeePrices}
+        gpFee={user.role === "FULFILLMENT"}
         showLedger={canSeeMoney}
         customerHref={`${base}/customers/${o.customerId}`}
         actions={<OrderActions orderId={o.id} status={o.status} role={user.role} editHref={`${base}/orders/${o.id}/edit`} listHref={`${base}/orders`} />}

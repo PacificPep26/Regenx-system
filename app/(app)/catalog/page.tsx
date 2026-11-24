@@ -13,7 +13,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const admin = u.role === "ADMIN";
   const partner = isPartner(u);
   const discountBps = partner ? (u.store?.discountBps ?? 0) : 0;
-  const showMoney = !(u.role === "PARTNER_STAFF" && u.store?.hideAmountsFromStaff);
+  const showMoney = u.role !== "FULFILLMENT" && !(u.role === "PARTNER_STAFF" && u.store?.hideAmountsFromStaff);
 
   const and: Prisma.ProductWhereInput[] = [];
   if (partner) and.push({ active: true, ...(u.store?.allowRestricted ? {} : { restricted: false }) });
