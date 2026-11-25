@@ -21,10 +21,13 @@ const STATUS_STYLE: Record<string, string> = {
   SUSPENDED: "bg-red text-white border-red",
 };
 
+// the stored status stays APPROVED; people see "Received" (the order arrived and is cleared for packing)
+export const statusLabel = (v: string) => (v === "APPROVED" ? "RECEIVED" : v.replace("_", " "));
+
 export function Badge({ value }: { value: OrderStatus | StatementStatus | string }) {
   return (
     <span className={`inline-block border px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${STATUS_STYLE[value] ?? "border-line"}`}>
-      {value.replace("_", " ")}
+      {statusLabel(value)}
     </span>
   );
 }

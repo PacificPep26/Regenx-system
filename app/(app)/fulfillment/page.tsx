@@ -6,7 +6,7 @@ import { viewsFor } from "@/lib/views";
 import { FilterBar } from "@/components/FilterBar";
 import { ViewToggle } from "@/components/ViewToggle";
 import { OrderTable, OrderBoard, orderSelect } from "@/components/OrderViews";
-import { PageHeader, Pager } from "@/components/ui";
+import { PageHeader, Pager, statusLabel } from "@/components/ui";
 import { US_STATES } from "@/lib/schemas";
 
 const FLOW = ["APPROVED", "PACKING", "SHIPPED", "DELIVERED"] as const;
@@ -34,7 +34,7 @@ export default async function FulfillmentPage({ searchParams }: { searchParams: 
         views={views}
         fields={[
           { type: "search", key: "q", placeholder: "Search #, store, customer, SKU, tracking…" },
-          { type: "multi", key: "status", label: "Status", options: flow.map((s) => ({ value: s, label: s.replace("_", " ") })) },
+          { type: "multi", key: "status", label: "Status", options: flow.map((s) => ({ value: s, label: statusLabel(s) })) },
           { type: "select", key: "store", label: "Store", options: stores.map((s) => ({ value: s.slug, label: s.name })) },
           { type: "date", from: "from", to: "to", label: "Created" },
           { type: "date", from: "sfrom", to: "sto", label: "Shipped" },

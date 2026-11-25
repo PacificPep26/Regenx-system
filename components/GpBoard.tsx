@@ -6,7 +6,7 @@ import { str, type SP } from "@/lib/query";
 import { FilterBar } from "@/components/FilterBar";
 import { PrintButton } from "@/components/PrintButton";
 import { GP_FEE_PER_UNIT_CENTS } from "@/lib/gpFee";
-import { Badge, Money, PageHeader } from "@/components/ui";
+import { Badge, Money, PageHeader, statusLabel } from "@/components/ui";
 
 const OPEN = ["APPROVED", "PACKING"] as const;
 const H = 3600_000;
@@ -185,7 +185,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
                   <li key={storeId} className="p-3">
                     <Link href={`/s/${s?.slug}/orders`} className="font-semibold text-navy">{s?.name}</Link>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-600">
-                      {statuses.map((k) => (<span key={k} className={k === "ON_HOLD" && row[k] ? "font-bold text-red" : ""}>{k.replace("_", " ").toLowerCase()} <b>{row[k] ?? 0}</b></span>))}
+                      {statuses.map((k) => (<span key={k} className={k === "ON_HOLD" && row[k] ? "font-bold text-red" : ""}>{statusLabel(k).toLowerCase()} <b>{row[k] ?? 0}</b></span>))}
                     </div>
                   </li>
                 );
@@ -193,7 +193,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
             </ul>
             <div className="hidden overflow-x-auto border border-line md:block">
               <table className="w-full min-w-[640px]">
-                <thead><tr><th className="th">Store</th>{statuses.map((s) => <th key={s} className="th text-right">{s.replace("_", " ")}</th>)}<th className="th text-right">Total</th></tr></thead>
+                <thead><tr><th className="th">Store</th>{statuses.map((s) => <th key={s} className="th text-right">{statusLabel(s)}</th>)}<th className="th text-right">Total</th></tr></thead>
                 <tbody>
                   {topStores.map(({ storeId }) => {
                     const s = sname.get(storeId);

@@ -118,7 +118,7 @@ export default async function StoreDashboard({ params, searchParams }: { params:
             {STATUSES.map((s) => (
               <Link key={s} href={`${base}/orders?status=${s}`} className="px-0.5 py-1 hover:bg-hover">
                 <div className={`text-lg font-bold leading-none ${s === "ON_HOLD" && counts[s] ? "text-red" : ""}`}>{counts[s] ?? 0}</div>
-                <div className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-gray-500 sm:text-[10px]">{s === "ON_HOLD" ? "On hold" : s.charAt(0) + s.slice(1).toLowerCase()}</div>
+                <div className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-gray-500 sm:text-[10px]">{s === "ON_HOLD" ? "On hold" : s === "APPROVED" ? "Received" : s.charAt(0) + s.slice(1).toLowerCase()}</div>
               </Link>
             ))}
           </div>
