@@ -73,7 +73,7 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
     role === "ADMIN"
       ? [["/overview", "Home", LayoutDashboard], ["/fulfillment", "Orders to ship", Truck], ["/reports", "Reports", BarChart3]]
       : role === "FULFILLMENT"
-        ? [["/gp", "Home", Gauge], ["/fulfillment", "Orders to ship", Truck], ["/earnings", "Earnings", Wallet]]
+        ? [["/gp", "Home", Gauge], ["/earnings", "Earnings", Wallet]]
         : [["/catalog", "Price list", Package]];
   const manage: Item[] =
     role === "ADMIN"

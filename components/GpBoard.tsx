@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { str, type SP } from "@/lib/query";
 import { FilterBar } from "@/components/FilterBar";
 import { PrintButton } from "@/components/PrintButton";
+import { OrderActions } from "@/components/OrderActions";
 import { GP_FEE_PER_UNIT_CENTS } from "@/lib/gpFee";
 import { Badge, Money, PageHeader, statusLabel } from "@/components/ui";
 
@@ -65,6 +66,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
 
   const cnt = Object.fromEntries(byStatus.map((g) => [g.status, g._count]));
   const openTotal = (cnt.APPROVED ?? 0) + (cnt.PACKING ?? 0);
+  const isGp = user.role === "FULFILLMENT";
   const age = (d: Date | null) => (d ? (now - d.getTime()) / H : 0);
   const stockAlertCount = alertCount[0]?.n ?? 0;
   const csvHref = "/api/pick-list" + (storeQ ? `?store=${encodeURIComponent(storeQ)}` : "");
@@ -72,9 +74,11 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
   return (
     <div className="space-y-5">
       {embedded ? <h2 id="warehouse" className="text-base font-bold text-navy">Warehouse</h2> : <PageHeader title="Home" actions={<PrintButton />} />}
-      <div className="print:hidden">
-        <FilterBar fields={[{ type: "search", key: "store", placeholder: "Filter by store name or slug…" }]} />
-      </div>
+      {!isGp && (
+        <div className="print:hidden">
+          <FilterBar fields={[{ type: "search", key: "store", placeholder: "Filter by store name or slug…" }]} />
+        </div>
+      )}
 
       <section className="grid grid-cols-3 gap-1.5 md:gap-2">
         {/* details + payout request live on /earnings */}
@@ -88,6 +92,9 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
 
       <Link href="/earnings" className="-mt-3 inline-block text-sm text-navy underline print:hidden">Earnings by day &amp; request payout</Link>
 
+      {isGp ? (
+        <p className="text-sm text-gray-600"><b className="text-navy">{cnt.APPROVED ?? 0}</b> to pack · <b className="text-navy">{cnt.PACKING ?? 0}</b> packed, waiting to ship · <b className="text-ok">{shippedToday}</b> shipped today{late ? <> · <b className="text-red">{late} late</b></> : null}</p>
+      ) : (
       <div className="grid grid-cols-3 gap-1.5 md:grid-cols-5 md:gap-2">
         <Kpi href="/fulfillment?status=APPROVED" n={cnt.APPROVED ?? 0} label="To pack" />
         <Kpi href="/fulfillment?status=PACKING" n={cnt.PACKING ?? 0} label="Packing" />
@@ -95,6 +102,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
         <Kpi n={warn} label="Waiting > 24h" tone={warn ? "warn" : "navy"} />
         <Kpi n={late} label="Late > 48h" tone={late ? "red" : "navy"} />
       </div>
+      )}
 
       {stockAlertCount > 0 && (
         <section>
@@ -130,6 +138,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
                     <span className="min-w-0 truncate"><b className="text-navy">{o.store.name} #{o.number}</b>{o.store.tier === "PREMIUM" && <span className="ml-1 border border-red px-1 text-[9px] font-bold uppercase text-red">Priority</span>} · {o._count.items} item(s) · {o.shipRegion}</span>
                     <span className="flex shrink-0 items-center gap-2"><Badge value={o.status} /><span className={`tabular-nums ${h > 48 ? "font-bold text-red" : ""}`}>{Math.floor(h)}h</span></span>
                   </Link>
+                  {isGp && <div className="border-l-4 border-transparent px-3 pb-3 print:hidden"><OrderActions orderId={o.id} status={o.status} role={user.role} listHref="/gp" compact /></div>}
                 </li>
               );
             })}
@@ -168,50 +177,52 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
         </section>
       )}
 
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="label mb-0">Stores with the most open work · top {topStores.length}</h2>
-          <Link href="/stores" className="text-sm text-navy underline">All stores</Link>
-        </div>
-        {topStores.length === 0 ? (
-          <p className="text-sm text-gray-500">No open work.</p>
-        ) : (
-          <>
-            <ul className="divide-y divide-line border border-line md:hidden">
-              {topStores.map(({ storeId }) => {
-                const s = sname.get(storeId);
-                const row = matrix.get(storeId) ?? {};
-                return (
-                  <li key={storeId} className="p-3">
-                    <Link href={`/s/${s?.slug}/orders`} className="font-semibold text-navy">{s?.name}</Link>
-                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-600">
-                      {statuses.map((k) => (<span key={k} className={k === "ON_HOLD" && row[k] ? "font-bold text-red" : ""}>{statusLabel(k).toLowerCase()} <b>{row[k] ?? 0}</b></span>))}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-            <div className="hidden overflow-x-auto border border-line md:block">
-              <table className="w-full min-w-[640px]">
-                <thead><tr><th className="th">Store</th>{statuses.map((s) => <th key={s} className="th text-right">{statusLabel(s)}</th>)}<th className="th text-right">Total</th></tr></thead>
-                <tbody>
-                  {topStores.map(({ storeId }) => {
-                    const s = sname.get(storeId);
-                    const row = matrix.get(storeId) ?? {};
-                    return (
-                      <tr key={storeId} className="hover:bg-hover">
-                        <td className="td"><Link href={`/s/${s?.slug}/orders`} className="font-semibold text-navy">{s?.name}</Link></td>
-                        {statuses.map((k) => (<td key={k} className={`td text-right tabular-nums ${k === "ON_HOLD" && row[k] ? "font-bold text-red" : ""}`}>{row[k] ?? 0}</td>))}
-                        <td className="td text-right font-bold">{statuses.reduce((t, k) => t + (row[k] ?? 0), 0)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </section>
+      {user.role === "ADMIN" && (
+        <section>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="label mb-0">Stores with the most open work · top {topStores.length}</h2>
+            <Link href="/stores" className="text-sm text-navy underline">All stores</Link>
+          </div>
+          {topStores.length === 0 ? (
+            <p className="text-sm text-gray-500">No open work.</p>
+          ) : (
+            <>
+              <ul className="divide-y divide-line border border-line md:hidden">
+                {topStores.map(({ storeId }) => {
+                  const s = sname.get(storeId);
+                  const row = matrix.get(storeId) ?? {};
+                  return (
+                    <li key={storeId} className="p-3">
+                      <Link href={`/s/${s?.slug}/orders`} className="font-semibold text-navy">{s?.name}</Link>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-600">
+                        {statuses.map((k) => (<span key={k} className={k === "ON_HOLD" && row[k] ? "font-bold text-red" : ""}>{statusLabel(k).toLowerCase()} <b>{row[k] ?? 0}</b></span>))}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="hidden overflow-x-auto border border-line md:block">
+                <table className="w-full min-w-[640px]">
+                  <thead><tr><th className="th">Store</th>{statuses.map((s) => <th key={s} className="th text-right">{statusLabel(s)}</th>)}<th className="th text-right">Total</th></tr></thead>
+                  <tbody>
+                    {topStores.map(({ storeId }) => {
+                      const s = sname.get(storeId);
+                      const row = matrix.get(storeId) ?? {};
+                      return (
+                        <tr key={storeId} className="hover:bg-hover">
+                          <td className="td"><Link href={`/s/${s?.slug}/orders`} className="font-semibold text-navy">{s?.name}</Link></td>
+                          {statuses.map((k) => (<td key={k} className={`td text-right tabular-nums ${k === "ON_HOLD" && row[k] ? "font-bold text-red" : ""}`}>{row[k] ?? 0}</td>))}
+                          <td className="td text-right font-bold">{statuses.reduce((t, k) => t + (row[k] ?? 0), 0)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {stuckCount > 0 && (
         <section>

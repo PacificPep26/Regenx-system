@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { submitOrder, cancelOrder, approveHold, deleteDraft } from "@/app/actions/orders";
@@ -13,16 +13,20 @@ type Props = {
   role: string;
   editHref?: string;
   listHref: string;
+  /** list rows: keep the tracking form closed until asked */
+  compact?: boolean;
 };
 
-export function OrderActions({ orderId, status, role, editHref, listHref }: Props) {
+export function OrderActions({ orderId, status, role, editHref, listHref, compact }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ error?: string; ok?: string }>();
-  const [shipOpen, setShipOpen] = useState(status === "PACKING"); // while packing, the tracking form is the next step: show it
+  const [shipOpen, setShipOpen] = useState(!compact && status === "PACKING"); // while packing, the tracking form is the next step: show it
   // after "Packed" the page refreshes in place (state is kept), so open the tracking form when the status changes
+  const prevStatus = useRef(status);
   useEffect(() => {
-    if (status === "PACKING") setShipOpen(true);
+    if (prevStatus.current !== status && status === "PACKING") setShipOpen(true);
+    prevStatus.current = status;
   }, [status]);
   const { dialog, confirm, prompt } = useDialog();
   const [shipState, shipAction, shipping] = useActionState(shipOrder, undefined);
