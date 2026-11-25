@@ -97,7 +97,7 @@ export function OrderActions({ orderId, status, role, editHref, listHref, compac
         </form>
       )}
       {shipOpen && (status === "PACKING" || status === "APPROVED") && (
-        <form action={shipAction} className="panel grid grid-cols-1 gap-2 p-3 sm:grid-cols-4">
+        <form action={shipAction} className={`panel grid grid-cols-1 gap-2 p-3 ${compact ? "[&>*]:!col-span-1" : "sm:grid-cols-4"}`}>
           <input type="hidden" name="orderId" value={orderId} />
           <div><label className="label">Carrier</label><input name="carrier" required className="input" list="carriers" /></div>
           <datalist id="carriers"><option value="USPS" /><option value="UPS" /><option value="FedEx" /><option value="DHL" /></datalist>

@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { Download } from "lucide-react";
+import { ChevronDown, Download } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { str, type SP } from "@/lib/query";
 import { FilterBar } from "@/components/FilterBar";
-import { PrintButton } from "@/components/PrintButton";
 import { OrderActions } from "@/components/OrderActions";
+import { ShowMore } from "@/components/ShowMore";
 import { GP_FEE_PER_UNIT_CENTS } from "@/lib/gpFee";
 import { Badge, Money, PageHeader, fmtDate, statusLabel } from "@/components/ui";
 
@@ -30,7 +30,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
   const [uToday, uWeek, uMonth] = await Promise.all([units(dayStart), units(weekStart), units(monthStart)]);
   const open = { status: { in: [...OPEN] }, ...storeFilter };
 
-  const [byStatus, shippedToday, warn, late, queue, stuckCount, stuck, topStores, pick, pickTotal, alertCount, alerts] = await Promise.all([
+  const [byStatus, shippedToday, warn, late, queue, stuckCount, stuck, topStores, pick, pickTotal, alertCount, alerts, lateByStore] = await Promise.all([
     db.order.groupBy({ by: ["status"], where: open, _count: true }),
     db.order.count({ where: { shippedAt: { gte: dayStart }, ...storeFilter } }),
     db.order.count({ where: { ...open, approvedAt: { lte: new Date(now - 24 * H), gt: new Date(now - 48 * H) } } }),
@@ -39,8 +39,8 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
       where: open,
       // oldest day first; Premium first inside each day (sorted below)
       orderBy: { approvedAt: "asc" },
-      take: TOP,
-      select: { id: true, number: true, status: true, approvedAt: true, shipRegion: true, store: { select: { name: true, tier: true } }, _count: { select: { items: true } } },
+      take: 200, // bounded; each store shows its first rows, the counts below come from SQL
+      select: { id: true, number: true, status: true, approvedAt: true, shipRegion: true, store: { select: { id: true, slug: true, name: true, tier: true } }, _count: { select: { items: true } } },
     }),
     db.order.count({ where: { status: "SHIPPED", shippedAt: { lt: new Date(now - 10 * 24 * H) }, ...storeFilter } }),
     db.order.findMany({ where: { status: "SHIPPED", shippedAt: { lt: new Date(now - 10 * 24 * H) }, ...storeFilter }, orderBy: { shippedAt: "asc" }, take: 8, select: { id: true, number: true, carrier: true, trackingNo: true, store: { select: { name: true } } } }),
@@ -50,6 +50,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
     db.orderItem.aggregate({ where: { order: open }, _sum: { qty: true } }),
     db.$queryRaw<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM "Product" WHERE "trackStock" AND active AND ("onHand" - "reserved") <= "reorderLevel"`,
     db.$queryRaw<Alert[]>`SELECT id, name, strength, sku, "onHand", "reserved", "reorderLevel" FROM "Product" WHERE "trackStock" AND active AND ("onHand" - "reserved") <= "reorderLevel" ORDER BY ("onHand" - "reserved") ASC LIMIT 8`,
+    db.order.groupBy({ by: ["storeId"], where: { ...open, approvedAt: { lt: dayStart } }, _count: true }),
   ]);
 
   const [products, matrixRows, storeNames] = await Promise.all([
@@ -67,19 +68,26 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
   const cnt = Object.fromEntries(byStatus.map((g) => [g.status, g._count]));
   const openTotal = (cnt.APPROVED ?? 0) + (cnt.PACKING ?? 0);
   const isGp = user.role === "FULFILLMENT";
-  // group the open queue by the New York day it was received; earlier days still open are late (red)
+  // the open queue grouped by store (a store opens to its orders); earlier days still open are late (red)
   const dayOf = (d: Date | null) => (d ?? new Date()).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-  const byDay = new Map<string, typeof queue>();
-  for (const o of queue) byDay.set(dayOf(o.approvedAt), [...(byDay.get(dayOf(o.approvedAt)) ?? []), o]);
-  const days = [...byDay].sort(([a], [b]) => (a < b ? -1 : 1)).map(([d, rows]) => [d, [...rows].sort((x, y) => Number(y.store.tier === "PREMIUM") - Number(x.store.tier === "PREMIUM"))] as const);
-  const lateCount = days.filter(([d]) => d < nyDate).reduce((n, [, r]) => n + r.length, 0);
+  const openBy = new Map(topStores.map((t) => [t.storeId, t._count]));
+  const lateBy = new Map(lateByStore.map((t) => [t.storeId, t._count]));
+  const byStore = new Map<string, { id: string; slug: string; name: string; tier: string; rows: typeof queue }>();
+  for (const o of queue) {
+    const g = byStore.get(o.store.id) ?? { ...o.store, rows: [] as typeof queue };
+    g.rows.push(o);
+    byStore.set(o.store.id, g);
+  }
+  const storeGroups = [...byStore.values()]
+    .map((g) => ({ ...g, open: openBy.get(g.id) ?? g.rows.length, late: lateBy.get(g.id) ?? 0, rows: g.rows.slice(0, 40) }))
+    .sort((x, y) => y.late - x.late || y.open - x.open);
   const age = (d: Date | null) => (d ? (now - d.getTime()) / H : 0);
   const stockAlertCount = alertCount[0]?.n ?? 0;
   const csvHref = "/api/pick-list" + (storeQ ? `?store=${encodeURIComponent(storeQ)}` : "");
 
   return (
     <div className="space-y-5">
-      {embedded ? <h2 id="warehouse" className="text-base font-bold text-navy">Warehouse</h2> : <PageHeader title="Home" actions={<PrintButton />} />}
+      {embedded ? <h2 id="warehouse" className="text-base font-bold text-navy">Warehouse</h2> : <PageHeader title="Home" actions={<Link href="/earnings" className="btn-primary">Earnings &amp; request payout</Link>} />}
       {!isGp && (
         <div className="print:hidden">
           <FilterBar fields={[{ type: "search", key: "store", placeholder: "Filter by store name or slug…" }]} />
@@ -96,14 +104,8 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
         ))}
       </section>
 
-      <Link href="/earnings" className="-mt-3 inline-block text-sm text-navy underline print:hidden">Earnings by day &amp; request payout</Link>
+      {!isGp && (
 
-      {isGp ? (
-        <div className="space-y-2">
-        {lateCount > 0 && <p role="alert" className="border-l-4 border-red bg-red/5 px-3 py-2 text-sm font-semibold text-red">{lateCount} order(s) from earlier days are not finished yet.</p>}
-        <p className="text-sm text-gray-600"><b className="text-navy">{cnt.APPROVED ?? 0}</b> to pack · <b className="text-navy">{cnt.PACKING ?? 0}</b> packed, waiting to ship · <b className="text-ok">{shippedToday}</b> shipped today{late ? <> · <b className="text-red">{late} late</b></> : null}</p>
-        </div>
-      ) : (
       <div className="grid grid-cols-3 gap-1.5 md:grid-cols-5 md:gap-2">
         <Kpi href="/fulfillment?status=APPROVED" n={cnt.APPROVED ?? 0} label="To pack" />
         <Kpi href="/fulfillment?status=PACKING" n={cnt.PACKING ?? 0} label="Packing" />
@@ -133,33 +135,44 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
       )}
 
       <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="label mb-0">Open queue · Premium first, then oldest{openTotal > TOP ? ` · ${TOP} of ${openTotal}` : ""}</h2>
-          {openTotal > TOP && <Link href="/fulfillment?status=APPROVED,PACKING&view=table" className="text-sm text-navy underline">All {openTotal}</Link>}
-        </div>
         {queue.length ? (
-          <div className="space-y-3">
-            {days.map(([day, rows]) => {
-              const late = day < nyDate;
-              return (
-                <div key={day}>
-                  <h3 className={`mb-1 text-xs font-bold uppercase tracking-wide ${late ? "text-red" : "text-gray-500"}`}>
-                    {day === nyDate ? "Today" : fmtDate(new Date(day + "T12:00:00Z"))}{late ? ` · not finished · ${rows.length}` : ` · ${rows.length}`}
-                  </h3>
-                  <ul className={`divide-y divide-line border ${late ? "border-red" : "border-line"}`}>
-                    {rows.map((o) => (
-                      <li key={o.id}>
-                        <Link href={`/fulfillment/${o.id}`} className={`flex items-center justify-between gap-2 border-l-4 p-3 text-sm hover:bg-hover ${late ? "border-red bg-red/5" : "border-transparent"}`}>
-                          <span className="min-w-0 truncate"><b className="text-navy">{o.store.name} #{o.number}</b>{o.store.tier === "PREMIUM" && <span className="ml-1 border border-red px-1 text-[9px] font-bold uppercase text-red">Priority</span>} · {o._count.items} item(s) · {o.shipRegion}</span>
-                          <span className="flex shrink-0 items-center gap-2"><Badge value={o.status} />{late && <span className="font-bold text-red">LATE</span>}</span>
-                        </Link>
-                        {isGp && <div className="border-l-4 border-transparent px-3 pb-3 print:hidden"><OrderActions orderId={o.id} status={o.status} role={user.role} listHref="/gp" compact /></div>}
-                      </li>
-                    ))}
+          <div className="space-y-2">
+            {storeGroups.map((g) => (
+              <details key={g.id} name="gp-store" className="group border border-line">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 hover:bg-hover [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <ChevronDown size={16} className="shrink-0 -rotate-90 transition-transform group-open:rotate-0" />
+                    <b className="truncate text-navy">{g.name}</b>
+                    {g.tier === "PREMIUM" && <span className="border border-red px-1 text-[9px] font-bold uppercase text-red">Priority</span>}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2 text-sm">
+                    {g.late > 0 && <span className="bg-red px-1.5 text-xs font-bold text-white">{g.late} not finished</span>}
+                    <span className="tabular-nums text-gray-600">{g.open} open</span>
+                  </span>
+                </summary>
+                <div className="space-y-2 border-t border-line p-3">
+                  <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    <ShowMore
+                      items={g.rows.map((o) => {
+                        const day = dayOf(o.approvedAt);
+                        const late = day < nyDate;
+                        return (
+                          <li key={o.id} className={`flex flex-col gap-2 border p-3 text-sm ${late ? "border-red bg-red/5" : "border-line"}`}>
+                            <div className="flex items-start justify-between gap-2">
+                              <Link href={`/fulfillment/${o.id}`} className="min-w-0 hover:underline"><b className="text-navy">#{o.number}</b> · {o._count.items} item(s) · {o.shipRegion}</Link>
+                              <Badge value={o.status} />
+                            </div>
+                            <div className={`text-xs ${late ? "font-bold text-red" : "text-gray-500"}`}>{day === nyDate ? "Today" : fmtDate(new Date(day + "T12:00:00Z"))}</div>
+                            {isGp && <div className="print:hidden"><OrderActions orderId={o.id} status={o.status} role={user.role} listHref="/gp" compact /></div>}
+                          </li>
+                        );
+                      })}
+                    />
                   </ul>
+                  {g.open > g.rows.length && <Link href={`/s/${g.slug}/orders?status=APPROVED,PACKING`} className="inline-block text-sm text-navy underline">All {g.open} open orders</Link>}
                 </div>
-              );
-            })}
+              </details>
+            ))}
           </div>
         ) : (
           <p className="text-sm text-gray-500">Queue is empty.</p>
