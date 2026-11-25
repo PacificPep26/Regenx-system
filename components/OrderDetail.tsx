@@ -20,7 +20,7 @@ const STEPS = [
   ["Created", "createdAt"],
   ["Submitted", "submittedAt"],
   ["Approved", "approvedAt"],
-  ["Packing started", "packedAt"],
+  ["Packed", "packedAt"],
   ["Shipped", "shippedAt"],
   ["Delivered", "deliveredAt"],
   ["Cancelled", "cancelledAt"],

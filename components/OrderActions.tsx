@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { submitOrder, cancelOrder, approveHold, deleteDraft } from "@/app/actions/orders";
@@ -20,6 +20,10 @@ export function OrderActions({ orderId, status, role, editHref, listHref }: Prop
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ error?: string; ok?: string }>();
   const [shipOpen, setShipOpen] = useState(status === "PACKING"); // while packing, the tracking form is the next step: show it
+  // after "Packed" the page refreshes in place (state is kept), so open the tracking form when the status changes
+  useEffect(() => {
+    if (status === "PACKING") setShipOpen(true);
+  }, [status]);
   const { dialog, confirm, prompt } = useDialog();
   const [shipState, shipAction, shipping] = useActionState(shipOrder, undefined);
   const [feeOpen, setFeeOpen] = useState(false);
@@ -52,8 +56,8 @@ export function OrderActions({ orderId, status, role, editHref, listHref }: Prop
           <button className="btn text-red" disabled={pending} onClick={async () => (await confirm({ title: "Delete draft", message: "The draft order will be removed.", confirmLabel: "Delete", danger: true })) && act(() => deleteDraft(orderId), listHref)}>Delete draft</button>
         )}
         {status === "ON_HOLD" && isAdmin && <button className="btn-primary" disabled={pending} onClick={() => act(() => approveHold(orderId))}>Approve overage</button>}
-        {status === "APPROVED" && isOps && <button className="btn-primary" disabled={pending} onClick={() => act(() => packOrder(orderId))}>Start packing</button>}
-        {(status === "PACKING" || status === "APPROVED") && isOps && <button className="btn" onClick={() => setShipOpen(!shipOpen)}>Enter tracking &amp; ship…</button>}
+        {status === "APPROVED" && isOps && <button className="btn-primary" disabled={pending} onClick={() => act(() => packOrder(orderId))}>Packed</button>}
+        {(status === "PACKING" || (status === "APPROVED" && isAdmin)) && isOps && <button className="btn" onClick={() => setShipOpen(!shipOpen)}>Enter tracking &amp; ship…</button>}
         {(status === "SHIPPED" || status === "DELIVERED") && isOps && <button className="btn" onClick={() => setFeeOpen(!feeOpen)}>Shipping fee…</button>}
         {status === "SHIPPED" && isOps && <button className="btn-primary" disabled={pending} onClick={() => act(() => deliverOrder(orderId))}>Mark delivered</button>}
         {canCancel && status !== "DRAFT" && (

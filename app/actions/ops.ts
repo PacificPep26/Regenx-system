@@ -40,7 +40,7 @@ async function run(fn: () => Promise<unknown>, ok: string, paths: string[] = [])
 
 export async function packOrder(orderId: string) {
   const u = await requireRole("ADMIN", "FULFILLMENT");
-  return run(() => startPacking(orderId, u), "Marked packing.");
+  return run(() => startPacking(orderId, u), "Marked packed. Enter the tracking number to ship.");
 }
 
 export async function shipOrder(_: OpsState, form: FormData) {
