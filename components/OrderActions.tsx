@@ -60,7 +60,7 @@ export function OrderActions({ orderId, status, role, editHref, listHref, compac
           <button className="btn text-red" disabled={pending} onClick={async () => (await confirm({ title: "Delete draft", message: "The draft order will be removed.", confirmLabel: "Delete", danger: true })) && act(() => deleteDraft(orderId), listHref)}>Delete draft</button>
         )}
         {status === "ON_HOLD" && isAdmin && <button className="btn-primary" disabled={pending} onClick={() => act(() => approveHold(orderId))}>Approve overage</button>}
-        {status === "APPROVED" && isOps && <button className="btn-primary" disabled={pending} onClick={() => act(() => packOrder(orderId))}>Packed</button>}
+        {status === "APPROVED" && isOps && <button className="btn-primary" disabled={pending} onClick={() => act(() => packOrder(orderId))}>Order received</button>}
         {(status === "PACKING" || (status === "APPROVED" && isAdmin)) && isOps && <button className="btn" onClick={() => setShipOpen(!shipOpen)}>Enter tracking &amp; ship…</button>}
         {(status === "SHIPPED" || status === "DELIVERED") && isOps && <button className="btn" onClick={() => setFeeOpen(!feeOpen)}>Shipping fee…</button>}
         {status === "SHIPPED" && isOps && <button className="btn-primary" disabled={pending} onClick={() => act(() => deliverOrder(orderId))}>Mark delivered</button>}

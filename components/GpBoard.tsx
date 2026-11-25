@@ -7,7 +7,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { OrderActions } from "@/components/OrderActions";
 import { ShowMore } from "@/components/ShowMore";
 import { GP_FEE_PER_UNIT_CENTS } from "@/lib/gpFee";
-import { Badge, Money, PageHeader, fmtDate, statusLabel } from "@/components/ui";
+import { Money, PageHeader, fmtDate, statusLabel } from "@/components/ui";
 
 const OPEN = ["APPROVED", "PACKING"] as const;
 const H = 3600_000;
@@ -160,7 +160,6 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
                           <li key={o.id} className={`flex flex-col gap-2 border p-3 text-sm ${late ? "border-red bg-red/5" : "border-line"}`}>
                             <div className="flex items-start justify-between gap-2">
                               <Link href={`/fulfillment/${o.id}`} className="min-w-0 hover:underline"><b className="text-navy">#{o.number}</b> · {o._count.items} item(s) · {o.shipRegion}</Link>
-                              <Badge value={o.status} />
                             </div>
                             <div className={`text-xs ${late ? "font-bold text-red" : "text-gray-500"}`}>{day === nyDate ? "Today" : fmtDate(new Date(day + "T12:00:00Z"))}</div>
                             {isGp && <div className="print:hidden"><OrderActions orderId={o.id} status={o.status} role={user.role} listHref="/gp" compact /></div>}
