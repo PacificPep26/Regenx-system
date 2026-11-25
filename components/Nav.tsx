@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Role } from "@prisma/client";
 import {
-  Bell, Menu, X, LayoutDashboard, Gauge, Inbox, Truck, Store, FileText, Package, Search,
-  Contact, Boxes, BarChart3, ChevronDown, Wallet, ShieldCheck, MessageSquare, UserRound, LogOut, type LucideIcon,
+  Bell, Menu, X, LayoutDashboard, Gauge, Truck, Store, FileText, Package, Search,
+  Contact, Boxes, BarChart3, ChevronDown, Wallet, ShieldCheck, UserRound, LogOut, type LucideIcon,
 } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { NotificationBell } from "./NotificationBell";
@@ -71,9 +71,9 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
   // frequent items stay on top; rarely-needed admin pages are grouped under "Manage" at the bottom
   const primary: Item[] =
     role === "ADMIN"
-      ? [["/overview", "Home", LayoutDashboard], ["/fulfillment", "Orders to ship", Truck], ["/inbox", "Messages", Inbox], ["/reports", "Reports", BarChart3]]
+      ? [["/overview", "Home", LayoutDashboard], ["/fulfillment", "Orders to ship", Truck], ["/reports", "Reports", BarChart3]]
       : role === "FULFILLMENT"
-        ? [["/gp", "Home", Gauge], ["/fulfillment", "Orders to ship", Truck], ["/inbox", "Messages", Inbox], ["/earnings", "Earnings", Wallet]]
+        ? [["/gp", "Home", Gauge], ["/fulfillment", "Orders to ship", Truck], ["/earnings", "Earnings", Wallet]]
         : [["/catalog", "Price list", Package]];
   const manage: Item[] =
     role === "ADMIN"
@@ -83,7 +83,7 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
         : [["/search", "Search", Search]];
   const [storeQ, setStoreQ] = useState("");
   const shownStores = stores.filter((x) => x.name.toLowerCase().includes(storeQ.trim().toLowerCase()));
-  const storeAlerts = stores.reduce((n, x) => n + (live.newOrders?.[x.id] ?? x.newOrders) + ((live.chatByStore[x.id] ?? 0) > 0 ? 1 : 0), 0);
+  const storeAlerts = stores.reduce((n, x) => n + (live.newOrders?.[x.id] ?? x.newOrders), 0);
   const manageActive = manage.some(([h]) => path === h || path.startsWith(h + "/"));
 
   const link = ([href, label, Icon]: Item, indent = false, count = 0) => {
@@ -129,7 +129,7 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
           <div className="hidden md:block">{bell}</div>
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto py-2">
-          {primary.map((it) => link(it, false, it[0] === "/inbox" ? live.chat : 0))}
+          {primary.map((it) => link(it))}
           {stores.length > 0 && (
             <details open className="group mt-2">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 hover:bg-hover [&::-webkit-details-marker]:hidden">
@@ -153,8 +153,7 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
                     <Link key={s.slug} href={`${base}/dashboard`} className={`flex items-center gap-2 border-l-4 py-2 pl-3 pr-3 text-sm ${inStore ? "border-red bg-soft font-semibold text-navy" : "border-transparent text-gray-700 hover:bg-hover"}`}>
                       <span className={`h-2.5 w-2.5 shrink-0 ${DOT[s.health]}`} />
                       <span className="min-w-0 flex-1 truncate">{s.name}</span>
-                      {(live.chatByStore[s.id] ?? 0) > 0 && <MessageSquare size={12} className="shrink-0 text-red" aria-label="unread chat" />}
-                      {fresh > 0 && (
+                                            {fresh > 0 && (
                         <span className="flex items-center gap-0.5 bg-red px-1.5 text-[11px] font-bold text-white" title={`${fresh} new order(s)`}>
                           <Bell size={10} strokeWidth={2.5} />
                           {fresh}

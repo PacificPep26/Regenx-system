@@ -35,8 +35,6 @@ export function OrderDetail({ o, showMoney, customerHref, actions, showLedger, g
         {o.externalRef && <span className="text-sm text-gray-500">Ref {o.externalRef}</span>}
       </div>
       {actions}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm print:hidden">
-        <Link href={`/s/${o.store.slug}/chat`} className="text-navy underline">Chat with {o.store.name}</Link>      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <section className="panel p-3 lg:col-span-2">

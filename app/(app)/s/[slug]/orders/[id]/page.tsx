@@ -16,7 +16,6 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
     <div>
       <div className="mb-3 flex items-center justify-between text-sm">
         <Link href={`${base}/orders`} className="text-navy"><ChevronLeft size={16} className="inline -mt-0.5" />Orders</Link>
-        <Link href={`${base}/chat?order=${o.id}`} className="btn h-8">Message about this order</Link>
       </div>
       {err && <p role="alert" className="mb-3 border-l-4 border-red bg-red/5 px-3 py-2 text-sm text-red">Saved as draft, not submitted: {err}</p>}
       <OrderDetail

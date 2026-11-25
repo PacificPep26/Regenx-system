@@ -14,7 +14,6 @@ export default async function StoreLayout({ children, params }: { children: Reac
     [`${base}/dashboard`, "Dashboard"],
     [`${base}/orders`, "Orders"],
     [`${base}/customers`, "Customers"],
-    [`${base}/chat`, "Chat"],
   ];
   // money pages live under one "Account" tab with a small second row
   const accountTabs: [string, string][] = [

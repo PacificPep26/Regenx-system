@@ -18,8 +18,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     total = list.length;
   } else {
     // stores with new orders / unread chat first, then the rest alphabetically up to the cap
-    const score = (id: string) => (fresh.get(id) ?? 0) + (unread.chatByStore[id] ?? 0);
-    const hot = [...new Set([...fresh.keys(), ...Object.keys(unread.chatByStore)])].sort((a, b) => score(b) - score(a)).slice(0, SIDEBAR_STORES);
+    const score = (id: string) => fresh.get(id) ?? 0;
+    const hot = [...fresh.keys()].sort((a, b) => score(b) - score(a)).slice(0, SIDEBAR_STORES);
     const [hotStores, rest, count] = await Promise.all([
       hot.length ? db.store.findMany({ where: { id: { in: hot } } }) : Promise.resolve([]),
       SIDEBAR_STORES - hot.length > 0 ? db.store.findMany({ where: { id: { notIn: hot } }, orderBy: { name: "asc" }, take: SIDEBAR_STORES - hot.length }) : Promise.resolve([]),
