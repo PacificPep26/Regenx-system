@@ -123,8 +123,8 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
       >
         <div className="flex items-center justify-between border-b-2 border-red px-4 py-4">
           <div>
-            <div className="font-bold tracking-wide text-navy">REGENX LABS</div>
-            <div className="text-xs text-gray-500">Partner Hub</div>
+            <div className="font-bold tracking-wide text-navy">REGENX</div>
+            <div className="text-xs text-gray-500">Distribution &amp; Fulfillment</div>
           </div>
           <div className="hidden md:block">{bell}</div>
         </div>

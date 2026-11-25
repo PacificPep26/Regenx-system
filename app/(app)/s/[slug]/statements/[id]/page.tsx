@@ -30,7 +30,7 @@ export default async function StatementPage({ params }: { params: Promise<{ slug
       <div className="panel border-t-4 border-t-red p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <div className="font-bold tracking-wide text-navy">REGENX LABS · Weekly statement</div>
+            <div className="font-bold tracking-wide text-navy">REGENX · Weekly statement</div>
             <div className="text-sm">{store.name} · {store.tier}</div>
             <div className="text-sm text-gray-500">{fmtDate(st.periodStart)} – {fmtDate(new Date(st.periodEnd.getTime() - 1))}</div>
           </div>

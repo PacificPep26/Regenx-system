@@ -52,7 +52,7 @@ export async function requestReset(_: ResetState, form: FormData): Promise<Reset
       body: JSON.stringify({
         from: process.env.STATEMENT_FROM_EMAIL,
         to: [user.email],
-        subject: "Reset your RegenX Partner Hub password",
+        subject: "Reset your RegenX password",
         html: `<p>Use this link within 1 hour to choose a new password:</p><p><a href="${base}/reset-password?token=${token}">Reset password</a></p><p>If you did not ask for this, ignore this email.</p>`,
       }),
     }).catch((e) => console.error("reset email failed", e));
