@@ -21,7 +21,7 @@ async function run(fn: () => Promise<unknown>, ok: string): Promise<PayoutState>
   return { ok };
 }
 
-export async function requestGpPayout(amount: string): Promise<PayoutState> {
+export async function requestGpPayout(amount: string, from?: string, to?: string): Promise<PayoutState> {
   const u = await requireRole("FULFILLMENT");
   return run(async () => {
     let cents: number;
@@ -30,7 +30,7 @@ export async function requestGpPayout(amount: string): Promise<PayoutState> {
     } catch {
       throw new UserError("Invalid amount");
     }
-    await requestPayout(u, cents);
+    await requestPayout(u, cents, from && to ? { from, to } : undefined);
   }, "Payout requested. The admin has been notified.");
 }
 

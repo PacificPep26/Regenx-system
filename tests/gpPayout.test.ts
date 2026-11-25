@@ -62,4 +62,12 @@ run("GP earnings and payout requests (db)", async () => {
     expect(await payoutSummary()).toMatchObject({ paid: 5_000, pending: 0, available: 0 });
     await expect(resolvePayout(second.id, admin, { status: "PAID" })).rejects.toThrow(/already/);
   });
+
+  it("a request for a period cannot exceed what was earned in those days", async () => {
+    await shipped(4, new Date("2026-11-04T15:00:00Z")); // +$40 on Nov 4, nothing paid or pending yet for it
+    await expect(requestPayout(gp, 3_000, { from: "2026-11-02", to: "2026-11-02" })).rejects.toThrow(/earned \$20\.00/); // within what is available, but more than that day earned
+    await expect(requestPayout(gp, 1_000, { from: "2026-11-05", to: "2026-11-01" })).rejects.toThrow(/valid period/);
+    await requestPayout(gp, 4_000, { from: "2026-11-04", to: "2026-11-04" });
+    expect(await db.gpPayout.findFirstOrThrow({ where: { status: "REQUESTED" } })).toMatchObject({ periodFrom: "2026-11-04", periodTo: "2026-11-04", amountCents: 4_000 });
+  });
 });

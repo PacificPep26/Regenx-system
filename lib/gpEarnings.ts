@@ -38,7 +38,10 @@ export async function payoutSummary(tx: Pick<Tx, "$queryRaw" | "gpPayout"> = db)
 
 const lock = (tx: Tx) => tx.$executeRaw`SELECT pg_advisory_xact_lock(7001)`; // one payout change at a time
 
-export function requestPayout(actor: Actor, amountCents: number) {
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** `period` (optional): New York days the request is for; the amount cannot exceed what was earned in them. */
+export function requestPayout(actor: Actor, amountCents: number, period?: { from: string; to: string }) {
   return db.$transaction(async (tx) => {
     await lock(tx);
     if (actor.role !== "FULFILLMENT") throw new UserError("Only the packing partner can request a payout.");
@@ -46,7 +49,13 @@ export function requestPayout(actor: Actor, amountCents: number) {
     if (await tx.gpPayout.count({ where: { status: "REQUESTED" } })) throw new UserError("You already have a request waiting for approval.");
     const s = await payoutSummary(tx);
     if (amountCents > s.available) throw new UserError(`You can request up to ${formatUSD(s.available)}.`);
-    const p = await tx.gpPayout.create({ data: { amountCents, requestedById: actor.id } });
+    if (period) {
+      if (!DAY_RE.test(period.from) || !DAY_RE.test(period.to) || period.from > period.to) throw new UserError("Choose a valid period.");
+      const days = await earningsByDay(new Date(period.from + "T05:00:00Z"), new Date(new Date(period.to + "T05:00:00Z").getTime() + 86400000));
+      const earnedIn = days.reduce((n, d) => n + d.cents, 0);
+      if (amountCents > earnedIn) throw new UserError(`You earned ${formatUSD(earnedIn)} in that period.`);
+    }
+    const p = await tx.gpPayout.create({ data: { amountCents, requestedById: actor.id, periodFrom: period?.from, periodTo: period?.to } });
     await notify(tx, { audience: "ADMIN", title: `GP requested a payout of ${formatUSD(amountCents)}`, link: "/payouts" });
     await audit(tx, actor.id, "gp.payout_request", "GpPayout", p.id, { amountCents });
     return p.id;

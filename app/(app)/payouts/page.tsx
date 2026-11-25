@@ -32,7 +32,7 @@ export default async function Payouts({ searchParams }: { searchParams: Promise<
           {rows.map((p) => (
             <li key={p.id} className="space-y-2 p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span><b className="text-navy"><Money cents={p.amountCents} /></b> · requested {fmtDateTime(p.requestedAt)}</span>
+                <span><b className="text-navy"><Money cents={p.amountCents} /></b> · requested {fmtDateTime(p.requestedAt)}{p.periodFrom ? ` · for ${p.periodFrom === p.periodTo ? p.periodFrom : `${p.periodFrom} → ${p.periodTo}`}` : ""}</span>
                 <Badge value={p.status} />
               </div>
               {p.status === "REQUESTED" ? (

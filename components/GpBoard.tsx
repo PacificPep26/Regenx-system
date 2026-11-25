@@ -7,7 +7,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { PrintButton } from "@/components/PrintButton";
 import { OrderActions } from "@/components/OrderActions";
 import { GP_FEE_PER_UNIT_CENTS } from "@/lib/gpFee";
-import { Badge, Money, PageHeader, statusLabel } from "@/components/ui";
+import { Badge, Money, PageHeader, fmtDate, statusLabel } from "@/components/ui";
 
 const OPEN = ["APPROVED", "PACKING"] as const;
 const H = 3600_000;
@@ -37,8 +37,8 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
     db.order.count({ where: { ...open, approvedAt: { lte: new Date(now - 48 * H) } } }),
     db.order.findMany({
       where: open,
-      // priority support: Premium stores first, then oldest first
-      orderBy: [{ store: { tier: "desc" } }, { approvedAt: "asc" }],
+      // oldest day first; Premium first inside each day (sorted below)
+      orderBy: { approvedAt: "asc" },
       take: TOP,
       select: { id: true, number: true, status: true, approvedAt: true, shipRegion: true, store: { select: { name: true, tier: true } }, _count: { select: { items: true } } },
     }),
@@ -67,6 +67,12 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
   const cnt = Object.fromEntries(byStatus.map((g) => [g.status, g._count]));
   const openTotal = (cnt.APPROVED ?? 0) + (cnt.PACKING ?? 0);
   const isGp = user.role === "FULFILLMENT";
+  // group the open queue by the New York day it was received; earlier days still open are late (red)
+  const dayOf = (d: Date | null) => (d ?? new Date()).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const byDay = new Map<string, typeof queue>();
+  for (const o of queue) byDay.set(dayOf(o.approvedAt), [...(byDay.get(dayOf(o.approvedAt)) ?? []), o]);
+  const days = [...byDay].sort(([a], [b]) => (a < b ? -1 : 1)).map(([d, rows]) => [d, [...rows].sort((x, y) => Number(y.store.tier === "PREMIUM") - Number(x.store.tier === "PREMIUM"))] as const);
+  const lateCount = days.filter(([d]) => d < nyDate).reduce((n, [, r]) => n + r.length, 0);
   const age = (d: Date | null) => (d ? (now - d.getTime()) / H : 0);
   const stockAlertCount = alertCount[0]?.n ?? 0;
   const csvHref = "/api/pick-list" + (storeQ ? `?store=${encodeURIComponent(storeQ)}` : "");
@@ -93,7 +99,10 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
       <Link href="/earnings" className="-mt-3 inline-block text-sm text-navy underline print:hidden">Earnings by day &amp; request payout</Link>
 
       {isGp ? (
+        <div className="space-y-2">
+        {lateCount > 0 && <p role="alert" className="border-l-4 border-red bg-red/5 px-3 py-2 text-sm font-semibold text-red">{lateCount} order(s) from earlier days are not finished yet.</p>}
         <p className="text-sm text-gray-600"><b className="text-navy">{cnt.APPROVED ?? 0}</b> to pack · <b className="text-navy">{cnt.PACKING ?? 0}</b> packed, waiting to ship · <b className="text-ok">{shippedToday}</b> shipped today{late ? <> · <b className="text-red">{late} late</b></> : null}</p>
+        </div>
       ) : (
       <div className="grid grid-cols-3 gap-1.5 md:grid-cols-5 md:gap-2">
         <Kpi href="/fulfillment?status=APPROVED" n={cnt.APPROVED ?? 0} label="To pack" />
@@ -129,20 +138,29 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
           {openTotal > TOP && <Link href="/fulfillment?status=APPROVED,PACKING&view=table" className="text-sm text-navy underline">All {openTotal}</Link>}
         </div>
         {queue.length ? (
-          <ul className="divide-y divide-line border border-line">
-            {queue.map((o) => {
-              const h = age(o.approvedAt);
+          <div className="space-y-3">
+            {days.map(([day, rows]) => {
+              const late = day < nyDate;
               return (
-                <li key={o.id}>
-                  <Link href={`/fulfillment/${o.id}`} className={`flex items-center justify-between gap-2 border-l-4 p-3 text-sm hover:bg-hover ${h > 48 ? "border-red" : h > 24 ? "border-warn" : "border-transparent"}`}>
-                    <span className="min-w-0 truncate"><b className="text-navy">{o.store.name} #{o.number}</b>{o.store.tier === "PREMIUM" && <span className="ml-1 border border-red px-1 text-[9px] font-bold uppercase text-red">Priority</span>} · {o._count.items} item(s) · {o.shipRegion}</span>
-                    <span className="flex shrink-0 items-center gap-2"><Badge value={o.status} /><span className={`tabular-nums ${h > 48 ? "font-bold text-red" : ""}`}>{Math.floor(h)}h</span></span>
-                  </Link>
-                  {isGp && <div className="border-l-4 border-transparent px-3 pb-3 print:hidden"><OrderActions orderId={o.id} status={o.status} role={user.role} listHref="/gp" compact /></div>}
-                </li>
+                <div key={day}>
+                  <h3 className={`mb-1 text-xs font-bold uppercase tracking-wide ${late ? "text-red" : "text-gray-500"}`}>
+                    {day === nyDate ? "Today" : fmtDate(new Date(day + "T12:00:00Z"))}{late ? ` · not finished · ${rows.length}` : ` · ${rows.length}`}
+                  </h3>
+                  <ul className={`divide-y divide-line border ${late ? "border-red" : "border-line"}`}>
+                    {rows.map((o) => (
+                      <li key={o.id}>
+                        <Link href={`/fulfillment/${o.id}`} className={`flex items-center justify-between gap-2 border-l-4 p-3 text-sm hover:bg-hover ${late ? "border-red bg-red/5" : "border-transparent"}`}>
+                          <span className="min-w-0 truncate"><b className="text-navy">{o.store.name} #{o.number}</b>{o.store.tier === "PREMIUM" && <span className="ml-1 border border-red px-1 text-[9px] font-bold uppercase text-red">Priority</span>} · {o._count.items} item(s) · {o.shipRegion}</span>
+                          <span className="flex shrink-0 items-center gap-2"><Badge value={o.status} />{late && <span className="font-bold text-red">LATE</span>}</span>
+                        </Link>
+                        {isGp && <div className="border-l-4 border-transparent px-3 pb-3 print:hidden"><OrderActions orderId={o.id} status={o.status} role={user.role} listHref="/gp" compact /></div>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               );
             })}
-          </ul>
+          </div>
         ) : (
           <p className="text-sm text-gray-500">Queue is empty.</p>
         )}

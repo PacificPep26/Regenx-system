@@ -15,11 +15,22 @@ export default async function Earnings({ searchParams }: { searchParams: Promise
   const r = dateRange(sp, "from", "to");
   const from = r?.gte ?? new Date(Date.now() - 30 * DAY);
   const to = r?.lt ?? new Date(Date.now() + DAY);
-  const [days, sum, payouts] = await Promise.all([
+  const [days, sum, payouts, recent] = await Promise.all([
     earningsByDay(from, to),
     payoutSummary(),
     db.gpPayout.findMany({ orderBy: { requestedAt: "desc" }, take: 20 }),
+    earningsByDay(new Date(Date.now() - 90 * DAY), new Date(Date.now() + DAY)), // days offered in the payout dialog
   ]);
+
+  // New York calendar days for the dialog presets
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const today = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }) + "T00:00:00Z");
+  const monday = new Date(today.getTime() - ((today.getUTCDay() + 6) % 7) * DAY);
+  const presets = [
+    { key: "yesterday", label: "Yesterday", from: iso(new Date(today.getTime() - DAY)), to: iso(new Date(today.getTime() - DAY)) },
+    { key: "week", label: "This week (Mon-today)", from: iso(monday), to: iso(today) },
+    { key: "lastweek", label: "Last week (Mon-Sun)", from: iso(new Date(monday.getTime() - 7 * DAY)), to: iso(new Date(monday.getTime() - DAY)) },
+  ];
 
   // group the day rows into Monday-start weeks
   const weeks = new Map<string, { units: number; cents: number }>();
@@ -34,7 +45,7 @@ export default async function Earnings({ searchParams }: { searchParams: Promise
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Earnings" actions={u.role === "FULFILLMENT" ? <RequestPayoutButton available={sum.available} blocked={sum.pending > 0} /> : undefined} />
+      <PageHeader title="Earnings" actions={u.role === "FULFILLMENT" ? <RequestPayoutButton available={sum.available} blocked={sum.pending > 0} presets={presets} days={recent.map((d) => ({ day: d.day, cents: d.cents }))} /> : undefined} />
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <Box label="Total earned" cents={sum.earned} />
         <Box label="Paid to you" cents={sum.paid} tone="ok" />
@@ -90,7 +101,7 @@ export default async function Earnings({ searchParams }: { searchParams: Promise
           <ul className="divide-y divide-line border border-line">
             {payouts.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
-                <span><Money cents={p.amountCents} className="font-bold" /> · {fmtDateTime(p.requestedAt)}{p.note ? <span className="text-gray-500"> · {p.note}</span> : null}</span>
+                <span><Money cents={p.amountCents} className="font-bold" /> · {fmtDateTime(p.requestedAt)}{p.periodFrom ? <span className="text-gray-500"> · for {p.periodFrom === p.periodTo ? p.periodFrom : `${p.periodFrom} → ${p.periodTo}`}</span> : null}{p.note ? <span className="text-gray-500"> · {p.note}</span> : null}</span>
                 <span className="flex items-center gap-2">
                   {p.method && <span className="text-xs text-gray-500">{p.method}{p.reference ? ` · ${p.reference}` : ""}</span>}
                   <Badge value={p.status} />

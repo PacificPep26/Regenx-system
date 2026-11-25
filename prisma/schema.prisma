@@ -445,6 +445,9 @@ model GpPayout {
   resolvedAt    DateTime?
   method        String?
   reference     String?
+  /// New York days (yyyy-mm-dd) the request covers; null = just an amount
+  periodFrom    String?
+  periodTo      String?
 
   @@index([status, requestedAt])
 }
