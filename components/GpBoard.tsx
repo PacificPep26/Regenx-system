@@ -16,7 +16,7 @@ type Alert = { id: string; name: string; strength: string; sku: string; onHand: 
 
 /** GP manager view: workload, aging/SLA, SKU pick totals and per-store order inventory. No money. */
 export async function GpBoard({ searchParams, embedded = false }: { searchParams: Promise<SP>; embedded?: boolean }) {
-  await requireRole("ADMIN", "FULFILLMENT");
+  const user = await requireRole("ADMIN", "FULFILLMENT");
   const sp = await searchParams;
   const storeQ = str(sp, "store");
   const storeFilter = storeQ ? { store: { OR: [{ slug: { contains: storeQ, mode: "insensitive" as const } }, { name: { contains: storeQ, mode: "insensitive" as const } }] } } : {};
@@ -139,32 +139,34 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
         )}
       </section>
 
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="label mb-0">Pick list · top {TOP} by units · {pickTotal._sum.qty ?? 0} units in open orders</h2>
-          <a href={csvHref} className="btn h-8 text-xs print:hidden"><Download size={14} /> Full list (CSV)</a>
-        </div>
-        {pickRows.length ? (
-          <div className="overflow-x-auto border border-line">
-            <table className="w-full min-w-[480px]">
-              <thead><tr><th className="th">Product</th><th className="th">Strength</th><th className="th">SKU / code</th><th className="th text-right">Orders</th><th className="th text-right">Units</th></tr></thead>
-              <tbody>
-                {pickRows.map((r) => (
-                  <tr key={r.id}>
-                    <td className="td">{r.name}</td>
-                    <td className="td">{r.strength}</td>
-                    <td className="td text-xs text-gray-500">{r.sku}{r.sourceCode ? ` · ${r.sourceCode}` : ""}</td>
-                    <td className="td text-right">{r.orders}</td>
-                    <td className="td text-right font-bold">{r.qty}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {user.role === "ADMIN" && (
+        <section>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="label mb-0">Pick list · top {TOP} by units · {pickTotal._sum.qty ?? 0} units in open orders</h2>
+            <a href={csvHref} className="btn h-8 text-xs print:hidden"><Download size={14} /> Full list (CSV)</a>
           </div>
-        ) : (
-          <p className="text-sm text-gray-500">Nothing to pick.</p>
-        )}
-      </section>
+          {pickRows.length ? (
+            <div className="overflow-x-auto border border-line">
+              <table className="w-full min-w-[480px]">
+                <thead><tr><th className="th">Product</th><th className="th">Strength</th><th className="th">SKU / code</th><th className="th text-right">Orders</th><th className="th text-right">Units</th></tr></thead>
+                <tbody>
+                  {pickRows.map((r) => (
+                    <tr key={r.id}>
+                      <td className="td">{r.name}</td>
+                      <td className="td">{r.strength}</td>
+                      <td className="td text-xs text-gray-500">{r.sku}{r.sourceCode ? ` · ${r.sourceCode}` : ""}</td>
+                      <td className="td text-right">{r.orders}</td>
+                      <td className="td text-right font-bold">{r.qty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Nothing to pick.</p>
+          )}
+        </section>
+      )}
 
       <section>
         <div className="mb-2 flex items-center justify-between">
