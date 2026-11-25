@@ -81,7 +81,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
         {([["Today", uToday], ["Last 7 days", uWeek], ["This month", uMonth]] as const).map(([label, n]) => (
           <div key={label} className="panel border-t-4 border-t-ok p-2 text-center md:p-3">
             <div className="text-xl font-bold md:text-2xl"><Money cents={n * GP_FEE_PER_UNIT_CENTS} /></div>
-            <div className="label mb-0">Packing fee · {label} · {n} unit{n === 1 ? "" : "s"}</div>
+            <div className="label mb-0">{label} · {n} unit{n === 1 ? "" : "s"} sold</div>
           </div>
         ))}
       </section>
