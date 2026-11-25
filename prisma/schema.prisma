@@ -426,3 +426,25 @@ model ApiKey {
 
   @@index([storeId])
 }
+
+enum PayoutStatus {
+  REQUESTED
+  PAID
+  REJECTED
+}
+
+/// GP's request to be paid its packing fees (lib/gpFee.ts). Separate from the store ledger on purpose.
+model GpPayout {
+  id            String       @id @default(cuid())
+  amountCents   Int
+  status        PayoutStatus @default(REQUESTED)
+  requestedById String
+  requestedAt   DateTime     @default(now())
+  note          String?
+  resolvedById  String?
+  resolvedAt    DateTime?
+  method        String?
+  reference     String?
+
+  @@index([status, requestedAt])
+}

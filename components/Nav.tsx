@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Role } from "@prisma/client";
 import {
   Bell, Menu, X, LayoutDashboard, Gauge, Inbox, Truck, Store, FileText, Package, Search,
-  Contact, Boxes, BarChart3, ChevronDown, ShieldCheck, MessageSquare, UserRound, LogOut, type LucideIcon,
+  Contact, Boxes, BarChart3, ChevronDown, Wallet, ShieldCheck, MessageSquare, UserRound, LogOut, type LucideIcon,
 } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { NotificationBell } from "./NotificationBell";
@@ -73,11 +73,11 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
     role === "ADMIN"
       ? [["/overview", "Home", LayoutDashboard], ["/fulfillment", "Orders to ship", Truck], ["/inbox", "Messages", Inbox], ["/reports", "Reports", BarChart3]]
       : role === "FULFILLMENT"
-        ? [["/gp", "Home", Gauge], ["/fulfillment", "Orders to ship", Truck], ["/inbox", "Messages", Inbox]]
+        ? [["/gp", "Home", Gauge], ["/fulfillment", "Orders to ship", Truck], ["/inbox", "Messages", Inbox], ["/earnings", "Earnings", Wallet]]
         : [["/catalog", "Price list", Package]];
   const manage: Item[] =
     role === "ADMIN"
-      ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/stock", "Stock", Boxes], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package], ["/users", "Users", ShieldCheck], ["/search", "Search", Search]]
+      ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/stock", "Stock", Boxes], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package], ["/payouts", "GP payouts", Wallet], ["/users", "Users", ShieldCheck], ["/search", "Search", Search]]
       : role === "FULFILLMENT"
         ? [["/stock", "Stock", Boxes], ["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/catalog", "Catalog", Package], ["/search", "Search", Search]]
         : [["/search", "Search", Search]];

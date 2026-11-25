@@ -13,6 +13,8 @@ const STATUS_STYLE: Record<string, string> = {
   CANCELLED: "border-gray-300 text-gray-400 line-through",
   ISSUED: "border-navy text-navy",
   PAID: "bg-ok text-white border-ok",
+  REQUESTED: "border-warn text-warn",
+  REJECTED: "border-gray-300 text-gray-500",
   OVERDUE: "bg-red text-white border-red",
   ACTIVE: "border-ok text-ok",
   PENDING: "border-warn text-warn",

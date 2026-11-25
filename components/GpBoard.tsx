@@ -77,6 +77,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
       </div>
 
       <section className="grid grid-cols-3 gap-1.5 md:gap-2">
+        {/* details + payout request live on /earnings */}
         {([["Today", uToday], ["Last 7 days", uWeek], ["This month", uMonth]] as const).map(([label, n]) => (
           <div key={label} className="panel border-t-4 border-t-ok p-2 text-center md:p-3">
             <div className="text-xl font-bold md:text-2xl"><Money cents={n * GP_FEE_PER_UNIT_CENTS} /></div>
@@ -84,6 +85,8 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
           </div>
         ))}
       </section>
+
+      <Link href="/earnings" className="-mt-3 inline-block text-sm text-navy underline print:hidden">Earnings by day &amp; request payout</Link>
 
       <div className="grid grid-cols-3 gap-1.5 md:grid-cols-5 md:gap-2">
         <Kpi href="/fulfillment?status=APPROVED" n={cnt.APPROVED ?? 0} label="To pack" />
