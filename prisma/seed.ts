@@ -77,7 +77,7 @@ async function seedProducts() {
 }
 
 async function seedDemo() {
-  const hash = await bcrypt.hash("ChangeMe123!", 10);
+  const hash = await bcrypt.hash("1233", 10);
   const stores = [
     { name: "Alpha Peptides", slug: "alpha", tier: "STARTER" as const, requiredBalanceCents: 1_000_000, discountBps: 500 },
     { name: "Beta Wellness", slug: "beta", tier: "PREMIUM" as const, requiredBalanceCents: 5_000_000, discountBps: 1000 },
@@ -109,7 +109,7 @@ async function seedDemo() {
         data: { storeId: store.id, bucket: "CREDIT", type: "DEPOSIT", amountCents: s.requiredBalanceCents, memo: "Initial deposit (demo)" },
       });
   }
-  console.log("Demo users (password ChangeMe123!): admin@regenx.local, gp@regenx.local, alpha@partner.local, beta@partner.local");
+  console.log("Demo users (password 1233): admin@regenx.local, gp@regenx.local, alpha@partner.local, beta@partner.local");
 }
 
 seedProducts()

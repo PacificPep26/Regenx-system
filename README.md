@@ -13,7 +13,7 @@ pnpm db:seed                         # 313 SKUs from the PDF + demo users (SEED_
 pnpm dev
 ```
 
-Demo logins (password `ChangeMe123!`, change after first login):
+Demo logins (password `1233`, change after first login):
 
 | Email | Role |
 |---|---|
