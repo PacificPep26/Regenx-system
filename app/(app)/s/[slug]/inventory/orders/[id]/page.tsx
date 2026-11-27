@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireStore } from "@/lib/auth";
 import { InventoryActions } from "@/components/InventoryActions";
+import { TopUpButton } from "@/components/TopUpButton";
 import { invBadge } from "@/lib/inventoryLabels";
 import { Badge, Money, fmtDateTime } from "@/components/ui";
 
@@ -12,6 +13,7 @@ export default async function InventoryOrderPage({ params }: { params: Promise<{
   const { user, store, canSeePrices } = await requireStore(slug);
   const o = await db.inventoryOrder.findUnique({ where: { id }, include: { items: { include: { product: true } } } });
   if (!o || o.storeId !== store.id) notFound();
+  const topUps = user.role === "PARTNER_OWNER" && o.status === "ON_HOLD" ? await db.topUpRequest.count({ where: { storeId: store.id, status: "REQUESTED" } }) : 0;
   const base = `/s/${slug}/inventory`;
   const steps: [string, Date | null][] = [["Created", o.createdAt], ["Submitted", o.submittedAt], ["Approved", o.approvedAt], ["In your stock", o.receivedAt], ["Cancelled", o.cancelledAt]];
   return (
@@ -21,6 +23,12 @@ export default async function InventoryOrderPage({ params }: { params: Promise<{
         <h2 className="text-lg font-bold text-navy">Inventory order #{o.number}</h2>
         <Badge value={invBadge(o.status)} />
       </div>
+      {o.status === "ON_HOLD" && canSeePrices && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-l-4 border-red bg-red/5 px-3 py-2 text-sm text-red">
+          <span>On hold: over your credit by <b>${(o.overageCents / 100).toFixed(2)}</b>. Add funds so the admin can approve it.</span>
+          {user.role === "PARTNER_OWNER" && <TopUpButton storeId={store.id} suggested={o.overageCents} pending={topUps > 0} />}
+        </div>
+      )}
       <InventoryActions id={o.id} status={o.status} role={user.role} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <section className="panel p-3 lg:col-span-2">
@@ -43,8 +51,9 @@ export default async function InventoryOrderPage({ params }: { params: Promise<{
             <dl className="mt-2 space-y-1 border-t border-line pt-2 text-sm">
               <div className="flex justify-between"><dt>Subtotal</dt><dd><Money cents={o.subtotalCents} /></dd></div>
               <div className="flex justify-between"><dt>Discount {o.discountBps / 100}%</dt><dd><Money cents={o.totalCents - o.subtotalCents} /></dd></div>
-              <div className="flex justify-between"><dt><b>Inventory value</b></dt><dd><b><Money cents={o.totalCents} /></b></dd></div>
-              <p className="pt-1 text-xs text-gray-500">Not charged now. Cost of goods is deducted when your customer orders are processed.</p>
+              <div className="flex justify-between"><dt><b>Cost of goods</b></dt><dd><b><Money cents={o.totalCents} /></b></dd></div>
+              <div className="flex justify-between"><dt>Taken from your credit</dt><dd><Money cents={o.creditAppliedCents} /></dd></div>
+              {o.overageCents > 0 && <div className="flex justify-between text-red"><dt>Over credit (outstanding)</dt><dd><Money cents={o.overageCents} className="text-red" /></dd></div>}
             </dl>
           )}
         </section>

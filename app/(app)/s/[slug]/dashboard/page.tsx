@@ -10,6 +10,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { Badge, Empty, Money, Pager, fmtDate } from "@/components/ui";
 import { orderSelect } from "@/components/OrderViews";
 import { TopUpButton } from "@/components/TopUpButton";
+import { AddInventoryPanel } from "@/components/AddInventoryPanel";
 
 const LIVE = { notIn: ["DRAFT", "CANCELLED"] as ("DRAFT" | "CANCELLED")[] };
 const STATUSES = ["ON_HOLD", "APPROVED", "PACKING", "SHIPPED", "DELIVERED"] as const;
@@ -83,7 +84,6 @@ export default async function StoreDashboard({ params, searchParams }: { params:
   const totals = { ordered: stats[0]?.t_ordered ?? 0, pending: stats[0]?.t_pending ?? 0, shipped: stats[0]?.t_shipped ?? 0, delivered: stats[0]?.t_delivered ?? 0 };
   const pageRows = rows;
   const base = `/s/${slug}`;
-  const onHold = counts.ON_HOLD ?? 0;
   const dueDate = lastStmt && lastStmt.status !== "PAID" ? lastStmt.dueAt : nextStatement;
   // keep the stats section open while the user is filtering/paging it
   const statsOpen = !!q || !!range || page > 1;
@@ -104,8 +104,8 @@ export default async function StoreDashboard({ params, searchParams }: { params:
                 </div>
                 {canEdit && (
                   <div className="flex w-full gap-2 sm:w-auto">
-                    {store.inventoryMode && <Link href={`${base}/inventory?add=1`} className="btn h-9 flex-1 justify-center px-2 text-xs sm:h-10 sm:flex-none sm:px-4 sm:text-sm">+ Add inventory</Link>}
-                    <Link href={`${base}/orders/new`} className="btn-primary h-9 flex-1 justify-center px-2 text-xs sm:h-10 sm:flex-none sm:px-4 sm:text-sm">+ Add customer order</Link>
+                    {store.inventoryMode && <AddInventoryPanel storeId={store.id} slug={slug} discountBps={store.discountBps} creditCents={bal.CREDIT} icon={false} label="+ Add inventory" className="btn h-9 flex-1 justify-center px-2 text-xs sm:h-10 sm:flex-none sm:px-4 sm:text-sm" />}
+                    <Link href={`${base}/orders/new`} className="btn-primary h-9 flex-1 justify-center px-2 text-xs sm:h-10 sm:flex-none sm:px-4 sm:text-sm">+ Add order</Link>
                   </div>
                 )}
               </div>
@@ -129,7 +129,7 @@ export default async function StoreDashboard({ params, searchParams }: { params:
               </dl>
             </>
           )}
-          {!canSeeMoney && canEdit && <Link href={`${base}/orders/new`} className="btn-primary mb-3">+ Add customer order</Link>}
+          {!canSeeMoney && canEdit && <Link href={`${base}/orders/new`} className="btn-primary mb-3">+ Add order</Link>}
           <div className={`grid grid-cols-5 gap-1 text-center ${canSeeMoney ? "mt-3 border-t border-line pt-3" : ""}`}>
             {STATUSES.map((s) => (
               <Link key={s} href={`${base}/orders?status=${s}`} className="px-0.5 py-1 hover:bg-hover">

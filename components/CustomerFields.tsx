@@ -36,13 +36,13 @@ export function CustomerFields({
   );
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
-      {f("name", "Full name *", { required: true, autoComplete: "name" }, "sm:col-span-3")}
-      {f("company", "Company", { autoComplete: "organization" }, "sm:col-span-3")}
-      {f("email", "Email *", { type: "email", required: true, autoComplete: "email", inputMode: "email" }, "sm:col-span-3")}
-      {f("phone", "Phone *", { type: "tel", required: true, autoComplete: "tel", inputMode: "tel" }, "sm:col-span-3")}
+    <div className="grid grid-cols-2 gap-x-2 gap-y-2 sm:grid-cols-6 sm:gap-3">
+      {f("name", "Full name *", { required: true, autoComplete: "name" }, "col-span-1 sm:col-span-3")}
+      {f("company", "Company", { autoComplete: "organization" }, "col-span-1 sm:col-span-3")}
+      {f("email", "Email *", { type: "email", required: true, autoComplete: "email", inputMode: "email" }, "col-span-1 sm:col-span-3")}
+      {f("phone", "Phone *", { type: "tel", required: true, autoComplete: "tel", inputMode: "tel" }, "col-span-1 sm:col-span-3")}
 
-      <div className="sm:col-span-6">
+      <div className="col-span-2 sm:col-span-6">
         <label className="label" htmlFor="c-country">Country *</label>
         <select
           id="c-country"
@@ -64,11 +64,11 @@ export function CustomerFields({
         </select>
       </div>
 
-      {f("line1", "Address *", { required: true, autoComplete: "address-line1" }, "sm:col-span-6")}
-      {f("line2", "Apt / suite", { autoComplete: "address-line2" }, "sm:col-span-6")}
-      {f("city", "City *", { required: true, autoComplete: "address-level2" }, "sm:col-span-2")}
+      {f("line1", "Address *", { required: true, autoComplete: "address-line1" }, "col-span-2 sm:col-span-6")}
+      {f("line2", "Apt / suite", { autoComplete: "address-line2" }, "col-span-1 sm:col-span-3")}
+      {f("city", "City *", { required: true, autoComplete: "address-level2" }, "col-span-1 sm:col-span-3")}
 
-      <div className="sm:col-span-2">
+      <div className="col-span-1 sm:col-span-3">
         <label className="label" htmlFor="c-region">{isUS ? "State *" : "State / Province *"}</label>
         {isUS ? (
           <select id="c-region" name="region" required autoComplete="address-level1" className={`input ${errors.region ? "border-red" : ""}`} {...bind("region")}>
@@ -82,14 +82,14 @@ export function CustomerFields({
         )}
         {errors.region && <p className="mt-1 text-xs text-red">{errors.region}</p>}
       </div>
-      {f("postalCode", isUS ? "ZIP *" : "Postal code *", { required: true, autoComplete: "postal-code" }, "sm:col-span-2")}
+      {f("postalCode", isUS ? "ZIP *" : "Postal code *", { required: true, autoComplete: "postal-code" }, "col-span-1 sm:col-span-3")}
 
       {withMeta && (
         <>
-          {f("tags", "Tags (comma separated)", {}, "sm:col-span-6")}
-          <div className="sm:col-span-6">
+          {f("tags", "Tags (comma separated)", {}, "col-span-2 sm:col-span-6")}
+          <div className="col-span-2 sm:col-span-6">
             <label className="label" htmlFor="c-notes">Notes</label>
-            <textarea id="c-notes" name="notes" rows={3} className="input h-auto py-2" {...bind("notes")} />
+            <textarea id="c-notes" name="notes" rows={2} className="input h-auto py-2" {...bind("notes")} />
           </div>
         </>
       )}

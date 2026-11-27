@@ -86,20 +86,26 @@ export function ProductPicker({
       <li key={p.id} className={`flex items-center gap-2 px-3 py-2 text-sm ${n ? "bg-red/5" : ""}`}>
         <div className="min-w-0 flex-1">
           <div className="truncate font-medium">{p.name} <span className="font-normal text-gray-500">{p.strength}</span></div>
-          <div className="flex items-center gap-2 truncate text-xs text-gray-400">
-            {p.sku}
-            {p.available != null && <span className="shrink-0 border border-navy px-1 text-[10px] font-semibold uppercase text-navy">{p.available} in stock</span>}
+          <div className="mt-0.5 flex items-center gap-x-2 text-xs text-gray-400">
+            {p.available != null ? (
+              // inventory mode: what is left, live as the quantity changes
+              <span className={`shrink-0 font-semibold ${p.available - n <= 0 ? "text-red" : "text-navy"}`}>
+                {n ? `${p.available - n} left of ${p.available}` : `${p.available} in stock`}
+              </span>
+            ) : (
+              <span className="hidden truncate sm:inline">{p.sku}</span>
+            )}
             {!stockOnly && p.flag && (
               <span className={`shrink-0 border px-1 text-[10px] font-semibold uppercase ${p.flag === "out" ? "border-red text-red" : "border-warn text-warn"}`}>
-                {p.flag === "out" ? "out of stock" : "low stock"}
+                {p.flag === "out" ? "out" : "low"}
               </span>
             )}
-            {!!p.hits && (
-              <span className="inline-flex shrink-0 items-center gap-0.5 text-red"><Flame size={11} /> ordered {p.hits}×</span>
+            {!!p.hits && !stockOnly && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 text-red"><Flame size={11} /> {p.hits}×</span>
             )}
           </div>
         </div>
-        {showMoney && <div className="hidden shrink-0 text-xs tabular-nums text-gray-600 sm:block">{formatUSD(net(p.basePriceCents))}</div>}
+        {showMoney && <div className="shrink-0 text-right text-xs font-semibold tabular-nums text-navy">{formatUSD(net(p.basePriceCents))}</div>}
         {n === 0 ? (
           <button type="button" className="btn h-9 w-9 px-0" aria-label={`Add ${p.name} ${p.strength}`} onClick={() => setQty(p, 1)}><Plus size={16} /></button>
         ) : (

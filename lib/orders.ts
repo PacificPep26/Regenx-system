@@ -47,10 +47,11 @@ export function submitOrder(orderId: string, actor: Actor) {
       store.discountBps,
     );
     const bal = await getBalances(store.id, { tx });
-    // inventory mode: units come from the store's own stock at GP, but the cost of goods is charged now, like any order
+    // inventory mode: the goods were already paid when the store added them to its inventory, so a customer order takes
+    // units from that stock and charges nothing for the goods (shipping is billed separately when GP ships)
     const inv = store.inventoryMode;
     if (inv) await assertStoreStock(tx, store.id, order.items, (m) => new UserError(m));
-    const { creditAppliedCents, overageCents } = splitCharge(bal.CREDIT, totalCents);
+    const { creditAppliedCents, overageCents } = inv ? { creditAppliedCents: 0, overageCents: 0 } : splitCharge(bal.CREDIT, totalCents);
     // Program rule: with an unsettled statement RegenX may limit *additional* fulfillment (beyond the prepaid credit);
     // orders fully covered by credit still go through.
     if (overdue && overageCents > 0)

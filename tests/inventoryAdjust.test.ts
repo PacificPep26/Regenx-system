@@ -11,7 +11,7 @@ run("store stock: admin adjustments and low-stock alerts (db)", async () => {
   const admin = { id: "admin-user", role: "ADMIN" };
   const owner = { id: "owner-user", role: "PARTNER_OWNER" };
   const staff = { id: "staff-user", role: "PARTNER_STAFF" };
-  let storeId = "", customerId = "", product = "", n = 0;
+  let storeId = "", customerId = "", product = "";
 
   const stock = async () => {
     const s = await db.storeStock.findUnique({ where: { storeId_productId: { storeId, productId: product } } });
@@ -19,7 +19,6 @@ run("store stock: admin adjustments and low-stock alerts (db)", async () => {
   };
   const lowAlerts = () => db.notification.count({ where: { audience: "STORE", storeId, title: { contains: "Low stock" } } });
   const customerOrder = async (qty: number) => {
-    n += 1;
     const s = await db.store.update({ where: { id: storeId }, data: { nextOrderNumber: { increment: 1 } } });
     return (await db.order.create({ data: { storeId, number: s.nextOrderNumber - 1, customerId, shipName: "T", shipLine1: "1", shipCity: "A", shipRegion: "TX", shipPostalCode: "1", shipCountry: "US", items: { create: [{ productId: product, qty, unitPriceCents: 0 }] } } })).id;
   };

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { submitInventory, cancelInventory } from "@/app/actions/inventory";
+import { submitInventory, cancelInventory, approveInventory } from "@/app/actions/inventory";
 import { useDialog } from "./Dialog";
 
 /** Buttons for one inventory order, by status and role. `compact` is the small form used inside lists. */
@@ -11,25 +11,25 @@ export function InventoryActions({ id, status, role, compact }: { id: string; st
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ error?: string; ok?: string }>();
   const { dialog, prompt } = useDialog();
-  const isAdmin = role === "ADMIN";
   const act = (fn: () => Promise<{ error?: string; ok?: string } | undefined>) =>
     start(async () => {
       const r = await fn();
       setMsg(r);
       if (!r?.error) router.refresh();
     });
-  const canCancel = status === "DRAFT";
+  const canCancel = status === "DRAFT" || status === "ON_HOLD";
   return (
     <div className="space-y-2">
       {dialog}
       <div className="flex flex-wrap gap-2">
+        {status === "ON_HOLD" && role === "ADMIN" && <button className="btn-primary" disabled={pending} onClick={() => act(() => approveInventory(id))}>Approve overage</button>}
         {status === "DRAFT" && role !== "FULFILLMENT" && <button className="btn-primary" disabled={pending} onClick={() => act(() => submitInventory(id))}>Submit</button>}
         {canCancel && !compact && role !== "FULFILLMENT" && (
           <button
             className="btn-danger"
             disabled={pending}
             onClick={async () => {
-              const reason = await prompt({ title: "Cancel inventory order", message: "Nothing was charged for this inventory order.", input: { label: "Reason (optional)", multiline: true }, confirmLabel: "Cancel order", danger: true });
+              const reason = await prompt({ title: "Cancel inventory order", message: "Anything charged for this inventory order will be reversed.", input: { label: "Reason (optional)", multiline: true }, confirmLabel: "Cancel order", danger: true });
               if (reason !== null) act(() => cancelInventory(id, reason || undefined));
             }}
           >

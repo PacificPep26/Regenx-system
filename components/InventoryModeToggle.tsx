@@ -12,7 +12,7 @@ export function InventoryModeToggle({ storeId, on }: { storeId: string; on: bool
   return (
     <div className="space-y-2 text-sm">
       <p className="text-gray-600">
-        On: the store adds inventory (kept at GP, nothing charged) and customer orders are filled from that stock; the cost of goods is deducted when each customer order is processed.
+        On: the store adds inventory (charged to credit at wholesale when added, kept at GP) and customer orders are filled from that stock with no second charge for the goods.
         Off: customer orders are not tied to a stock list, as before. Orders already in progress keep working either way.
       </p>
       <button

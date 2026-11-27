@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireStoreById, requireUser } from "@/lib/auth";
 import { UserError } from "@/lib/orders";
-import { adjustStoreStock, setReorderLevel, createInventoryDraft, submitInventoryOrder, cancelInventoryOrder, receiveInventoryOrder } from "@/lib/inventory";
+import { adjustStoreStock, setReorderLevel, createInventoryDraft, submitInventoryOrder, approveInventoryHold, cancelInventoryOrder, receiveInventoryOrder } from "@/lib/inventory";
 
 export type InvResult = { error?: string; ok?: string; id?: string };
 
@@ -43,9 +43,9 @@ export async function createInventoryOrder(raw: unknown): Promise<InvResult> {
     const id = await createInventoryDraft(store.id, user.id, { items: d.items, notes: d.notes });
     if (d.submit) {
       try {
-        await submitInventoryOrder(id, user);
+        const status = await submitInventoryOrder(id, user);
         refresh(store.slug);
-        return { ok: "Submitted. GP will stock it.", id };
+        return { ok: status === "ON_HOLD" ? "Over your credit: on hold until you add funds and the admin approves." : "Added to your inventory.", id };
       } catch (e) {
         refresh(store.slug);
         return { ...fail(e), id }; // draft stays so it can be fixed and resubmitted
@@ -61,9 +61,9 @@ export async function createInventoryOrder(raw: unknown): Promise<InvResult> {
 export async function submitInventory(id: string): Promise<InvResult> {
   try {
     const { o, user } = await load(id);
-    await submitInventoryOrder(id, user);
+    const status = await submitInventoryOrder(id, user);
     refresh(o.store.slug);
-    return { ok: "Submitted. GP will stock it." };
+    return { ok: status === "ON_HOLD" ? "Over your credit: on hold until the admin approves." : "Added to your inventory." };
   } catch (e) {
     return fail(e);
   }
@@ -76,6 +76,19 @@ export async function cancelInventory(id: string, reason?: string): Promise<InvR
     await cancelInventoryOrder(id, user, reason?.slice(0, 500));
     refresh(o.store.slug);
     return { ok: "Cancelled." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function approveInventory(id: string): Promise<InvResult> {
+  try {
+    const u = await requireUser();
+    if (u.role !== "ADMIN") return { error: "Admins only." };
+    const o = await db.inventoryOrder.findUniqueOrThrow({ where: { id }, include: { store: true } });
+    await approveInventoryHold(id, u);
+    refresh(o.store.slug);
+    return { ok: "Approved and added to the store's stock." };
   } catch (e) {
     return fail(e);
   }

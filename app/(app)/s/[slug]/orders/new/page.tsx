@@ -12,7 +12,7 @@ export default async function NewOrderPage({ params }: { params: Promise<{ slug:
   const [hasCustomers, bal] = await Promise.all([db.customer.count({ where: { storeId: store.id }, take: 1 }).then((n) => n > 0), getBalances(store.id)]);
   return (
     <div className="max-w-4xl">
-      <PageHeader title="Add customer order" />
+      <PageHeader title="Add order" />
       <OrderForm
         inventoryMode={store.inventoryMode}
         storeId={store.id}

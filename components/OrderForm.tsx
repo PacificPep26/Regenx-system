@@ -214,11 +214,14 @@ export function OrderForm({
                 Total <b className="tabular-nums">{formatUSD(total)}</b>
                 <span className="hidden text-gray-400 sm:inline"> ({formatUSD(subtotal)} − {discountBps / 100}%)</span>
               </div>
-              <div className={creditCents - total < 0 ? "text-red" : "text-gray-500"}>
-                Credit after: {formatUSD(creditCents - total)}
-                {creditCents - total < 0 && " · will be held for approval"}
-                {inventoryMode && creditCents - total >= 0 && " · units come from your inventory"}
-              </div>
+              {inventoryMode ? (
+                <div className="text-gray-500">From your inventory · goods already paid</div>
+              ) : (
+                <div className={creditCents - total < 0 ? "text-red" : "text-gray-500"}>
+                  Credit after: {formatUSD(creditCents - total)}
+                  {creditCents - total < 0 && <span className="hidden sm:inline"> · will be held for approval</span>}
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-sm">{lines.length} line(s)</div>
@@ -226,7 +229,7 @@ export function OrderForm({
           <div className="flex shrink-0 gap-2">
             <button type="button" className="btn" disabled={pending || !lines.length} onClick={() => save(false)}>Save draft</button>
             <button type="button" className="btn-primary" disabled={pending || !lines.length || (mode === "existing" && !draft && !customerId)} onClick={() => save(true)}>
-              {pending ? "Saving…" : "Submit customer order"}
+              {pending ? "Saving…" : "Submit order"}
             </button>
           </div>
         </div>

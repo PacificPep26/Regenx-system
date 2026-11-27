@@ -66,7 +66,6 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
   for (const g of matrixRows) matrix.set(g.storeId, { ...(matrix.get(g.storeId) ?? {}), [g.status]: g._count });
 
   const cnt = Object.fromEntries(byStatus.map((g) => [g.status, g._count]));
-  const openTotal = (cnt.APPROVED ?? 0) + (cnt.PACKING ?? 0);
   const isGp = user.role === "FULFILLMENT";
   // the open queue grouped by store (a store opens to its orders); earlier days still open are late (red)
   const dayOf = (d: Date | null) => (d ?? new Date()).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
@@ -81,7 +80,6 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
   const storeGroups = [...byStore.values()]
     .map((g) => ({ ...g, open: openBy.get(g.id) ?? g.rows.length, late: lateBy.get(g.id) ?? 0, rows: g.rows.slice(0, 40) }))
     .sort((x, y) => y.late - x.late || y.open - x.open);
-  const age = (d: Date | null) => (d ? (now - d.getTime()) / H : 0);
   const stockAlertCount = alertCount[0]?.n ?? 0;
   const csvHref = "/api/pick-list" + (storeQ ? `?store=${encodeURIComponent(storeQ)}` : "");
 

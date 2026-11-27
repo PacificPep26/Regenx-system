@@ -66,7 +66,9 @@ export function OrderDetail({ o, showMoney, customerHref, actions, showLedger, g
                 <Row k="Subtotal" v={<Money cents={o.subtotalCents} />} />
                 <Row k={`Discount ${o.discountBps / 100}%`} v={<Money cents={o.totalCents - o.subtotalCents} />} />
                 <Row k={<b>Goods total</b>} v={<b><Money cents={o.totalCents} /></b>} />
-                <Row k="Taken from your credit" v={<Money cents={o.creditAppliedCents} />} />
+                {o.store.inventoryMode && o.creditAppliedCents === 0 && o.overageCents === 0
+                  ? <Row k="Taken from your inventory" v={<span className="text-gray-500">already paid</span>} />
+                  : <Row k="Taken from your credit" v={<Money cents={o.creditAppliedCents} />} />}
                 {o.overageCents > 0 && <Row k={<span className="text-red">Over credit (outstanding)</span>} v={<Money cents={o.overageCents} className="text-red" />} />}
               </dl>
               <h3 className="label mt-3 border-t border-line pt-2">Shipping cost</h3>

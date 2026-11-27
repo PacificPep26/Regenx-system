@@ -1,7 +1,8 @@
 import "server-only";
 import type { InventoryStatus } from "@prisma/client";
 import { db } from "./db";
-import { priceOrder } from "./ledger";
+import { getBalances } from "./balances";
+import { priceOrder, splitCharge, refundEntries } from "./ledger";
 import { audit } from "./audit";
 import { notify } from "./notify";
 import { formatUSD } from "./money";
@@ -42,10 +43,21 @@ export async function createInventoryDraft(storeId: string, actorId: string, inp
   });
 }
 
+type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+/** The units join the store's own stock (no GP step). */
+async function stockIn(tx: Tx, o: { id: string; number: number; storeId: string; items: { productId: string; qty: number }[] }, actorId: string) {
+  await tx.storeStockMovement.createMany({
+    data: o.items.map((i) => ({ storeId: o.storeId, productId: i.productId, type: "RECEIPT" as const, onHandDelta: i.qty, inventoryOrderId: o.id, memo: `Inventory #${o.number}`, createdById: actorId })),
+  });
+  await checkStoreLow(tx, o.storeId, o.items.map((i) => i.productId));
+}
+
 /**
- * DRAFT -> RECEIVED in one step: the units join the store's stock right away (no GP click needed).
- * Nothing is charged: the cost of goods is deducted when a customer order is processed.
- * Only stores with a received deposit (ACTIVE) can stock up. Prices are stored to show the inventory's value.
+ * DRAFT -> RECEIVED. The cost of goods is charged now, at wholesale: from credit, and the part above credit becomes
+ * outstanding and the order waits ON_HOLD for admin approval (the units join the store's stock when it is approved).
+ * Customer orders later take units from this stock and are not charged for the goods again.
+ * Only stores with a received deposit (ACTIVE) can add inventory.
  */
 export function submitInventoryOrder(id: string, actor: Actor) {
   return db.$transaction(async (tx) => {
@@ -62,27 +74,58 @@ export function submitInventoryOrder(id: string, actor: Actor) {
     for (const i of o.items)
       if (i.unitPriceCents !== i.product.basePriceCents) await tx.inventoryOrderItem.update({ where: { id: i.id }, data: { unitPriceCents: i.product.basePriceCents } });
     const { subtotalCents, totalCents } = priceOrder(o.items.map((i) => ({ qty: i.qty, unitPriceCents: i.product.basePriceCents })), store.discountBps);
+    const bal = await getBalances(store.id, { tx });
+    const { creditAppliedCents, overageCents } = splitCharge(bal.CREDIT, totalCents);
+    const overdue = (await tx.statement.count({ where: { storeId: store.id, status: "OVERDUE" } })) > 0;
+    if (overdue && overageCents > 0) throw new UserError("Additional ordering beyond your credit is paused: this store has an overdue statement. Add funds first.");
+
+    const base = { storeId: store.id, inventoryOrderId: id, createdById: actor.id };
+    if (creditAppliedCents > 0) await tx.ledgerEntry.create({ data: { ...base, bucket: "CREDIT", type: "ORDER_DEBIT", amountCents: -creditAppliedCents, memo: `Inventory #${o.number}` } });
+    if (overageCents > 0) await tx.ledgerEntry.create({ data: { ...base, bucket: "OUTSTANDING", type: "OVERAGE", amountCents: overageCents, memo: `Inventory #${o.number} over credit` } });
+
+    const status: InventoryStatus = overageCents > 0 ? "ON_HOLD" : "RECEIVED";
     const now = new Date();
-    await tx.inventoryOrder.update({ where: { id }, data: { status: "RECEIVED", subtotalCents, discountBps: store.discountBps, totalCents, creditAppliedCents: 0, overageCents: 0, submittedAt: now, approvedAt: now, receivedAt: now } });
-    await tx.storeStockMovement.createMany({
-      data: o.items.map((i) => ({ storeId: store.id, productId: i.productId, type: "RECEIPT" as const, onHandDelta: i.qty, inventoryOrderId: id, memo: `Inventory #${o.number}`, createdById: actor.id })),
+    await tx.inventoryOrder.update({
+      where: { id },
+      data: { status, subtotalCents, discountBps: store.discountBps, totalCents, creditAppliedCents, overageCents, submittedAt: now, approvedAt: status === "RECEIVED" ? now : null, receivedAt: status === "RECEIVED" ? now : null },
     });
-    await checkStoreLow(tx, store.id, o.items.map((i) => i.productId));
-    await notify(tx, { audience: "ADMIN", storeId: store.id, title: `Inventory added: ${store.name} #${o.number} · value ${formatUSD(totalCents)}`, link: `/s/${store.slug}/inventory/orders/${id}` });
-    await audit(tx, actor.id, "inventory.submit", "InventoryOrder", id, { totalCents });
+    const link = `/s/${store.slug}/inventory/orders/${id}`;
+    if (status === "RECEIVED") {
+      await stockIn(tx, { ...o, storeId: store.id }, actor.id);
+      await notify(tx, { audience: "ADMIN", storeId: store.id, title: `Inventory added: ${store.name} #${o.number} · ${formatUSD(totalCents)}`, link });
+    } else {
+      await notify(tx, { audience: "ADMIN", storeId: store.id, title: `${store.name}: inventory #${o.number} over credit by ${formatUSD(overageCents)}`, link });
+      await notify(tx, { audience: "STORE", storeId: store.id, title: `Inventory #${o.number} on hold: exceeds credit by ${formatUSD(overageCents)}. Request a top-up.`, link });
+    }
+    await audit(tx, actor.id, "inventory.submit", "InventoryOrder", id, { status, totalCents, creditAppliedCents, overageCents });
+    return status;
   });
 }
 
-/** Only a draft can be cancelled (a submitted one is already in stock; the admin fixes counts with Adjust). Nothing was charged. */
+/** Admin approves an order held for going over credit: the units join the store's stock. */
+export function approveInventoryHold(id: string, actor: Actor) {
+  return db.$transaction(async (tx) => {
+    const o = await tx.inventoryOrder.findUniqueOrThrow({ where: { id }, include: { items: true, store: true } });
+    if (o.status !== "ON_HOLD") throw new UserError("Inventory order is not on hold.");
+    const now = new Date();
+    await tx.inventoryOrder.update({ where: { id }, data: { status: "RECEIVED", approvedAt: now, receivedAt: now } });
+    await stockIn(tx, o, actor.id);
+    await notify(tx, { audience: "STORE", storeId: o.storeId, title: `Inventory #${o.number} approved and added to your stock (overage billed next statement)`, link: `/s/${o.store.slug}/inventory/orders/${id}` });
+    await audit(tx, actor.id, "inventory.approve_hold", "InventoryOrder", id);
+  });
+}
+
+/** A draft or a held order can be cancelled (what was charged is reversed). One already in stock is fixed with Adjust. */
 export function cancelInventoryOrder(id: string, actor: Actor, reason?: string) {
   return db.$transaction(async (tx) => {
     const head = await tx.inventoryOrder.findUniqueOrThrow({ where: { id }, select: { storeId: true } });
     await lockStore(tx, head.storeId);
     const o = await tx.inventoryOrder.findUniqueOrThrow({ where: { id }, include: { store: true } });
-    const allowed: InventoryStatus[] = ["DRAFT"];
+    const allowed: InventoryStatus[] = ["DRAFT", "ON_HOLD"];
     if (!allowed.includes(o.status)) throw new UserError(`Cannot cancel an inventory order that is ${o.status.toLowerCase().replace("_", " ")}.`);
-    await tx.inventoryOrder.update({ where: { id }, data: { status: "CANCELLED", cancelledAt: new Date(), notes: reason ? `${o.notes ?? ""}
-Cancelled: ${reason}`.trim() : o.notes } });
+    if (o.status !== "DRAFT")
+      for (const e of refundEntries(o)) await tx.ledgerEntry.create({ data: { storeId: o.storeId, ...e, inventoryOrderId: id, createdById: actor.id, memo: `Cancel inventory #${o.number}` } });
+    await tx.inventoryOrder.update({ where: { id }, data: { status: "CANCELLED", cancelledAt: new Date(), notes: reason ? `${o.notes ?? ""}\nCancelled: ${reason}`.trim() : o.notes } });
     if (o.status !== "DRAFT") await notify(tx, { audience: actor.role === "ADMIN" ? "STORE" : "ADMIN", storeId: o.storeId, title: `Inventory #${o.number} cancelled`, body: reason, link: `/s/${o.store.slug}/inventory/orders/${id}` });
     await audit(tx, actor.id, "inventory.cancel", "InventoryOrder", id, { from: o.status, reason });
   });

@@ -11,7 +11,7 @@ import type { PickProduct } from "./OrderForm";
 type Line = { productId: string; qty: number };
 
 /** Inventory order: pick products and quantities for the store's own stock (no customer, no address). */
-export function InventoryForm({ storeId, slug, discountBps, onDone }: { storeId: string; slug: string; discountBps: number; onDone?: () => void }) {
+export function InventoryForm({ storeId, slug, discountBps, creditCents, onDone }: { storeId: string; slug: string; discountBps: number; creditCents: number; onDone?: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [lines, setLines] = useState<Line[]>([]);
@@ -88,8 +88,11 @@ export function InventoryForm({ storeId, slug, discountBps, onDone }: { storeId:
         {error && <p role="alert" className="mb-2 border-l-4 border-red bg-red/5 px-3 py-2 text-sm text-red">{error}</p>}
         <div className="flex items-center justify-between gap-2">
           <div className="text-xs md:text-sm">
-            <div>Inventory value <b className="tabular-nums">{formatUSD(total)}</b></div>
-            <div className="hidden text-gray-500 sm:block">No charge now. Cost of goods is deducted when your customer orders are processed.</div>
+            <div>Cost of goods <b className="tabular-nums">{formatUSD(total)}</b></div>
+            <div className={creditCents - total < 0 ? "text-red" : "text-gray-500"}>
+              Credit after: {formatUSD(creditCents - total)}
+              {creditCents - total < 0 && <span className="hidden sm:inline"> · held for approval, add funds</span>}
+            </div>
           </div>
           <button className="btn-primary shrink-0" disabled={pending || !lines.length} onClick={() => save(true)}>{pending ? "Adding…" : "Add to inventory"}</button>
         </div>
