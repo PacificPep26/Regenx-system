@@ -42,11 +42,14 @@ export default async function AllInventory({ searchParams }: { searchParams: Pro
   const totalOnHand = sum(rows, (r) => r.onHand);
   const totalReserved = sum(rows, (r) => r.reserved);
 
+  const stockedCount = new Set(rows.map((r) => r.storeId)).size;
+  const storeDisplay = storeSlug ? "1" : stores.length > stockedCount ? `${stockedCount} of ${stores.length}` : String(stockedCount);
+
   return (
     <div className="space-y-4">
       <PageHeader title="Store inventory" />
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        {([["Products", groups.length], ["Stores", new Set(rows.map((r) => r.storeId)).size], ["On hand", totalOnHand], ["Reserved", totalReserved]] as const).map(([l, n]) => (
+        {([["Products", String(groups.length)], ["Stores with stock", storeDisplay], ["On hand", String(totalOnHand)], ["Reserved", String(totalReserved)]] as const).map(([l, n]) => (
           <div key={l} className="panel border-t-4 border-t-navy p-3 text-center"><div className="text-xl font-bold tabular-nums">{n}</div><div className="label mb-0">{l}</div></div>
         ))}
       </div>
