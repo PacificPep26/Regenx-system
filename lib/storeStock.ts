@@ -39,20 +39,41 @@ export async function reserveStoreStock(tx: Tx, storeId: string, orderId: string
   await checkStoreLow(tx, storeId, items.map((i) => i.productId));
 }
 
-/** After available stock changes: tell the store once when a product reaches its minimum, and re-arm when it recovers. */
+/** Alert at or below this many units when the owner has not set a minimum of their own. */
+export const DEFAULT_LOW_STOCK = 5;
+export const effectiveMinimum = (reorderLevel: number) => (reorderLevel > 0 ? reorderLevel : DEFAULT_LOW_STOCK);
+
+/**
+ * After available stock changes: tell the store once when a product is running low (at or below its minimum, default
+ * DEFAULT_LOW_STOCK) and once more when it is out; both re-arm when the stock is back above the minimum.
+ */
 export async function checkStoreLow(tx: Tx, storeId: string, productIds: string[]) {
   const rows = await tx.storeStock.findMany({
-    where: { storeId, productId: { in: productIds }, OR: [{ reorderLevel: { gt: 0 } }, { lowNotified: true }] },
+    where: { storeId, productId: { in: productIds } },
     include: { product: { select: { name: true, strength: true } }, store: { select: { slug: true } } },
   });
   for (const r of rows) {
     const available = r.onHand - r.reserved;
-    const low = r.reorderLevel > 0 && available <= r.reorderLevel;
-    if (low && !r.lowNotified) {
-      await tx.storeStock.update({ where: { storeId_productId: { storeId, productId: r.productId } }, data: { lowNotified: true } });
-      await notify(tx, { audience: "STORE", storeId, title: `${available <= 0 ? "Out of stock" : "Low stock"}: ${r.product.name} ${r.product.strength} (${available} available, minimum ${r.reorderLevel})`, link: `/s/${r.store.slug}/inventory` });
-    } else if (!low && r.lowNotified) {
-      await tx.storeStock.update({ where: { storeId_productId: { storeId, productId: r.productId } }, data: { lowNotified: false } });
+    const min = effectiveMinimum(r.reorderLevel);
+    const key = { storeId_productId: { storeId, productId: r.productId } };
+    const what = `${r.product.name} ${r.product.strength}`;
+    const link = `/s/${r.store.slug}/inventory`;
+    if (available <= 0) {
+      if (!r.outNotified) {
+        await tx.storeStock.update({ where: key, data: { outNotified: true, lowNotified: true } });
+        await notify(tx, { audience: "STORE", storeId, title: `Out of stock: ${what}. Add inventory to keep taking orders.`, link });
+        const name = (await tx.store.findUniqueOrThrow({ where: { id: storeId }, select: { name: true } })).name;
+        for (const audience of ["ADMIN", "FULFILLMENT"] as const)
+          await notify(tx, { audience, storeId, title: `${name} is out of stock: ${what}`, link: `/inventory?store=${r.store.slug}` });
+      }
+    } else if (available <= min) {
+      if (!r.lowNotified) {
+        await tx.storeStock.update({ where: key, data: { lowNotified: true } });
+        await notify(tx, { audience: "STORE", storeId, title: `Running low: ${what} (${available} left, minimum ${min}). Add inventory soon.`, link });
+      }
+      if (r.outNotified) await tx.storeStock.update({ where: key, data: { outNotified: false } });
+    } else if (r.lowNotified || r.outNotified) {
+      await tx.storeStock.update({ where: key, data: { lowNotified: false, outNotified: false } });
     }
   }
 }

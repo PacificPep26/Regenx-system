@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronDown, Download } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { hasLegacyStores } from "@/lib/legacyStock";
 import { str, type SP } from "@/lib/query";
 import { FilterBar } from "@/components/FilterBar";
 import { OrderActions } from "@/components/OrderActions";
@@ -80,7 +81,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
   const storeGroups = [...byStore.values()]
     .map((g) => ({ ...g, open: openBy.get(g.id) ?? g.rows.length, late: lateBy.get(g.id) ?? 0, rows: g.rows.slice(0, 40) }))
     .sort((x, y) => y.late - x.late || y.open - x.open);
-  const stockAlertCount = alertCount[0]?.n ?? 0;
+  const stockAlertCount = (await hasLegacyStores()) ? alertCount[0]?.n ?? 0 : 0;
   const csvHref = "/api/pick-list" + (storeQ ? `?store=${encodeURIComponent(storeQ)}` : "");
 
   return (

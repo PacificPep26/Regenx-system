@@ -1,6 +1,7 @@
 import { requireUser, isPartner } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { health } from "@/lib/balances";
+import { hasLegacyStores } from "@/lib/legacyStock";
 import { Nav, type NavStore } from "@/components/Nav";
 import { unreadCounts } from "@/lib/notify";
 import { newOrderCounts } from "@/lib/newOrders";
@@ -42,7 +43,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }));
   return (
     <div className="min-h-dvh md:flex">
-      <Nav role={user.role} userName={user.name} stores={stores} totalStores={total} unread={unread} />
+      <Nav role={user.role} userName={user.name} stores={stores} totalStores={total} unread={unread} legacyStock={user.role !== "PARTNER_OWNER" && user.role !== "PARTNER_STAFF" ? await hasLegacyStores() : false} />
       <main className="min-w-0 flex-1 px-4 py-4 md:px-8 md:py-6">{children}</main>
     </div>
   );

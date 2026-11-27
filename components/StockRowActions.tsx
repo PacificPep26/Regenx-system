@@ -6,7 +6,7 @@ import { adjustStock, setMinimum } from "@/app/actions/inventory";
 import { useDialog } from "./Dialog";
 
 /** Per-row tools on the store's stock list: admin fixes a count; the owner sets the minimum that triggers a low-stock alert. */
-export function StockRowActions({ storeId, productId, name, minimum, canAdjust, canSetMinimum }: { storeId: string; productId: string; name: string; minimum: number; canAdjust: boolean; canSetMinimum: boolean }) {
+export function StockRowActions({ storeId, productId, name, minimum, custom, canAdjust, canSetMinimum }: { storeId: string; productId: string; name: string; minimum: number; custom?: boolean; canAdjust: boolean; canSetMinimum: boolean }) {
   const router = useRouter();
   const [busy, start] = useTransition();
   const [err, setErr] = useState<string>();
@@ -23,11 +23,11 @@ export function StockRowActions({ storeId, productId, name, minimum, canAdjust, 
           className="btn h-7 px-2 text-xs"
           disabled={busy}
           onClick={async () => {
-            const v = await prompt({ title: `Minimum for ${name}`, message: "You get a notification when the available stock reaches this number. 0 turns it off.", input: { label: "Minimum units", placeholder: String(minimum), required: true }, confirmLabel: "Save" });
+            const v = await prompt({ title: `Minimum for ${name}`, message: "You get a notification when the available stock reaches this number (and again when it is out). 0 = the default of 5.", input: { label: "Minimum units", placeholder: String(minimum), required: true }, confirmLabel: "Save" });
             if (v !== null) start(async () => done(await setMinimum(storeId, productId, Number(v))));
           }}
         >
-          Min {minimum}
+          {custom ? `Alert at ${minimum}` : `Alert at ${minimum} (auto)`}
         </button>
       )}
       {canAdjust && (

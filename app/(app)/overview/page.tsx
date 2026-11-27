@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { hasLegacyStores } from "@/lib/legacyStock";
 import { health } from "@/lib/balances";
 import { Badge, Money, PageHeader, Stat, fmtDate } from "@/components/ui";
 import { RunStatements } from "./RunStatements";
@@ -27,6 +28,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
     db.order.count({ where: { status: { in: ["APPROVED", "PACKING"] }, approvedAt: { lte: new Date(Date.now() - 48 * 3600_000) } } }),
     db.$queryRaw<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM "Product" WHERE "trackStock" AND active AND ("onHand" - "reserved") <= "reorderLevel"`,
   ]);
+  const legacy = await hasLegacyStores();
   const totals = { credit: totalsAgg._sum.creditCents ?? 0, out: totalsAgg._sum.outstandingCents ?? 0, ship: totalsAgg._sum.shippingCents ?? 0 };
   const q = Object.fromEntries(queue.map((g) => [g.status, g._count]));
   const more = (n: number, href: string, label: string) => (n > TOP ? <Link href={href} className="mt-1 inline-block text-sm text-navy underline">{label} ({n})</Link> : null);
@@ -45,7 +47,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
         <Link href="/fulfillment?status=PACKING" className="panel border-t-4 border-t-navy p-3"><div className="text-2xl font-bold">{q.PACKING ?? 0}</div><div className="label">Packing</div></Link>
         <a href="#holds" className="panel border-t-4 border-t-red p-3"><div className="text-2xl font-bold text-red">{holdCount}</div><div className="label">On hold</div></a>
         <Link href="#warehouse" className={`panel border-t-4 p-3 ${late ? "border-t-red" : "border-t-navy"}`}><div className={`text-2xl font-bold ${late ? "text-red" : ""}`}>{late}</div><div className="label">Late &gt; 48h</div></Link>
-        <Link href="/stock?status=low" className={`panel col-span-2 border-t-4 p-3 md:col-span-1 ${lowStock[0]?.n ? "border-t-red" : "border-t-navy"}`}><div className={`text-2xl font-bold ${lowStock[0]?.n ? "text-red" : ""}`}>{lowStock[0]?.n ?? 0}</div><div className="label">Low stock</div></Link>
+        {legacy && <Link href="/stock?status=low" className={`panel col-span-2 border-t-4 p-3 md:col-span-1 ${lowStock[0]?.n ? "border-t-red" : "border-t-navy"}`}><div className={`text-2xl font-bold ${lowStock[0]?.n ? "text-red" : ""}`}>{lowStock[0]?.n ?? 0}</div><div className="label">Low stock</div></Link>}
       </div>
 
       <section>

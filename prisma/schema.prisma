@@ -546,6 +546,7 @@ model StoreStock {
   /// the owner's minimum: at or below it the store is notified once (lowNotified avoids repeats)
   reorderLevel Int     @default(0)
   lowNotified  Boolean @default(false)
+  outNotified  Boolean @default(false)
 
   @@id([storeId, productId])
 }

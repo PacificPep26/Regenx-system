@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireStoreById, requireUser } from "@/lib/auth";
 import { UserError } from "@/lib/orders";
-import { adjustStoreStock, setReorderLevel, createInventoryDraft, submitInventoryOrder, approveInventoryHold, cancelInventoryOrder, receiveInventoryOrder } from "@/lib/inventory";
+import { adjustStoreStock, reportCountMismatch, setReorderLevel, createInventoryDraft, submitInventoryOrder, approveInventoryHold, cancelInventoryOrder, receiveInventoryOrder } from "@/lib/inventory";
 
 export type InvResult = { error?: string; ok?: string; id?: string };
 
@@ -124,6 +124,16 @@ export async function adjustStock(storeId: string, productId: string, delta: num
     await adjustStoreStock(storeId, productId, Math.trunc(Number(delta)), reason, u);
     refresh(s.slug);
     return { ok: "Stock adjusted." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function reportMismatch(storeId: string, productId: string, counted: number): Promise<InvResult> {
+  try {
+    const u = await requireUser();
+    await reportCountMismatch(storeId, productId, Math.trunc(Number(counted)), u);
+    return { ok: "Reported to the admin." };
   } catch (e) {
     return fail(e);
   }

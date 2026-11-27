@@ -93,6 +93,7 @@ export function submitInventoryOrder(id: string, actor: Actor) {
     if (status === "RECEIVED") {
       await stockIn(tx, { ...o, storeId: store.id }, actor.id);
       await notify(tx, { audience: "ADMIN", storeId: store.id, title: `Inventory added: ${store.name} #${o.number} · ${formatUSD(totalCents)}`, link });
+      await notify(tx, { audience: "FULFILLMENT", storeId: store.id, title: `Inventory added for ${store.name} #${o.number}: ${o.items.reduce((n, i) => n + i.qty, 0)} unit(s)`, link: `/inventory?store=${store.slug}` });
     } else {
       await notify(tx, { audience: "ADMIN", storeId: store.id, title: `${store.name}: inventory #${o.number} over credit by ${formatUSD(overageCents)}`, link });
       await notify(tx, { audience: "STORE", storeId: store.id, title: `Inventory #${o.number} on hold: exceeds credit by ${formatUSD(overageCents)}. Request a top-up.`, link });
@@ -110,6 +111,7 @@ export function approveInventoryHold(id: string, actor: Actor) {
     const now = new Date();
     await tx.inventoryOrder.update({ where: { id }, data: { status: "RECEIVED", approvedAt: now, receivedAt: now } });
     await stockIn(tx, o, actor.id);
+    await notify(tx, { audience: "FULFILLMENT", storeId: o.storeId, title: `Inventory added for ${o.store.name} #${o.number}: ${o.items.reduce((n, i) => n + i.qty, 0)} unit(s)`, link: `/inventory?store=${o.store.slug}` });
     await notify(tx, { audience: "STORE", storeId: o.storeId, title: `Inventory #${o.number} approved and added to your stock (overage billed next statement)`, link: `/s/${o.store.slug}/inventory/orders/${id}` });
     await audit(tx, actor.id, "inventory.approve_hold", "InventoryOrder", id);
   });
@@ -165,6 +167,26 @@ export function adjustStoreStock(storeId: string, productId: string, delta: numb
     await checkStoreLow(tx, storeId, [productId]);
     await notify(tx, { audience: "STORE", storeId, title: `Stock adjusted: ${product.name} ${product.strength} ${delta > 0 ? "+" : ""}${delta}`, body: reason.trim(), link: `/s/${store.slug}/inventory/history` });
     await audit(tx, actor.id, "inventory.adjust", "Store", storeId, { productId, delta, reason });
+  });
+}
+
+/** GP (or admin): the physical count does not match the system. Tells the admin, who corrects it with Adjust (quantity only). */
+export function reportCountMismatch(storeId: string, productId: string, counted: number, actor: Actor) {
+  return db.$transaction(async (tx) => {
+    if (actor.role !== "FULFILLMENT" && actor.role !== "ADMIN") throw new UserError("Only GP can report a count.");
+    if (!Number.isInteger(counted) || counted < 0 || counted > 1_000_000) throw new UserError("Enter the counted units as a whole number, 0 or more.");
+    const row = await tx.storeStock.findUnique({ where: { storeId_productId: { storeId, productId } }, include: { product: true, store: true } });
+    if (!row) throw new UserError("This store has no stock of that product.");
+    if (counted === row.onHand) throw new UserError("That matches the system, nothing to report.");
+    const diff = counted - row.onHand;
+    await notify(tx, {
+      audience: "ADMIN",
+      storeId,
+      title: `Count mismatch · ${row.store.name} · ${row.product.name} ${row.product.strength}: system ${row.onHand}, counted ${counted} (${diff > 0 ? "+" : ""}${diff})`,
+      body: "Check the shelf, then fix the number with Adjust on the store's Inventory page.",
+      link: `/s/${row.store.slug}/inventory`,
+    });
+    await audit(tx, actor.id, "inventory.count_mismatch", "Store", storeId, { productId, system: row.onHand, counted });
   });
 }
 

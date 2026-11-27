@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
+import { hasLegacyStores } from "@/lib/legacyStock";
 import { str, one, pageOf, flat, type SP } from "@/lib/query";
 import { FilterBar } from "@/components/FilterBar";
 import { Empty, PageHeader, Pager } from "@/components/ui";
@@ -13,6 +15,7 @@ type Row = Omit<StockRowData, "available"> & { total_rows: number };
 /** GP / admin stock control. Counters are cached on Product by DB triggers; filtering, sorting and paging all happen in SQL. */
 export default async function StockPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireRole("ADMIN", "FULFILLMENT");
+  if (!(await hasLegacyStores())) redirect("/inventory"); // every store is on inventory mode: GP's warehouse is the stores' inventory
   const sp = await searchParams;
   const q = str(sp, "q");
   // default view = products we actually control; searching or picking "All" reveals the rest

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Prisma, StockType } from "@prisma/client";
 import { db } from "@/lib/db";
+import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
+import { hasLegacyStores } from "@/lib/legacyStock";
 import { str, list, dateRange, pageOf, flat, type SP } from "@/lib/query";
 import { FilterBar } from "@/components/FilterBar";
 import { Empty, PageHeader, Pager } from "@/components/ui";
@@ -11,6 +13,7 @@ const sign = (n: number) => (n > 0 ? `+${n}` : String(n));
 
 export default async function StockHistory({ searchParams }: { searchParams: Promise<SP> }) {
   await requireRole("ADMIN", "FULFILLMENT");
+  if (!(await hasLegacyStores())) redirect("/inventory"); // every store is on inventory mode: GP's warehouse is the stores' inventory
   const sp = await searchParams;
   const q = str(sp, "q");
   const types = list(sp, "type", TYPES);

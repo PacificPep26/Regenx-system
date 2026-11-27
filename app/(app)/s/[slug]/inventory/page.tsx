@@ -7,6 +7,7 @@ import { requireStore } from "@/lib/auth";
 import { flat, pageOf, str, type SP } from "@/lib/query";
 import { FilterBar } from "@/components/FilterBar";
 import { StockRowActions } from "@/components/StockRowActions";
+import { effectiveMinimum } from "@/lib/storeStock";
 import { AddInventoryPanel } from "@/components/AddInventoryPanel";
 import { invBadge } from "@/lib/inventoryLabels";
 import { Badge, Empty, Money, PageHeader, Pager, fmtDate } from "@/components/ui";
@@ -66,7 +67,7 @@ export default async function InventoryPage({ params, searchParams }: { params: 
               {pageGroups.map((g) => {
                 const avail = g.reduce((n, r) => n + r.onHand - r.reserved, 0);
                 const out = g.some((r) => r.onHand - r.reserved <= 0);
-                const low = g.some((r) => r.reorderLevel > 0 && r.onHand - r.reserved <= r.reorderLevel);
+                const low = g.some((r) => r.onHand - r.reserved <= effectiveMinimum(r.reorderLevel));
                 return (
                   <li key={g[0].product.name}>
                     <details className="group">
@@ -92,7 +93,7 @@ export default async function InventoryPage({ params, searchParams }: { params: 
                               <span className="tabular-nums text-xs text-gray-600">
                                 <b className="text-sm text-navy">{available}</b> available · {r.onHand} on hand{r.reserved ? ` · ${r.reserved} reserved` : ""}
                               </span>
-                              {owner && <StockRowActions storeId={store.id} productId={r.productId} name={`${r.product.name} ${r.product.strength}`} minimum={r.reorderLevel} canAdjust={isAdmin} canSetMinimum={owner} />}
+                              {owner && <StockRowActions storeId={store.id} productId={r.productId} name={`${r.product.name} ${r.product.strength}`} minimum={effectiveMinimum(r.reorderLevel)} custom={r.reorderLevel > 0} canAdjust={isAdmin} canSetMinimum={owner} />}
                             </li>
                           );
                         })}

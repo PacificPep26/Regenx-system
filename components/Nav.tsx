@@ -17,7 +17,7 @@ export type NavStore = { id: string; slug: string; name: string; health: "green"
 const DOT = { green: "bg-ok", yellow: "bg-warn", red: "bg-red", grey: "bg-gray-300" };
 type Item = [href: string, label: string, icon: LucideIcon];
 
-export function Nav({ role, userName, stores, totalStores = stores.length, unread }: { role: Role; userName: string; stores: NavStore[]; totalStores?: number; unread: Unread }) {
+export function Nav({ role, userName, stores, totalStores = stores.length, unread, legacyStock = false }: { role: Role; userName: string; stores: NavStore[]; totalStores?: number; unread: Unread; legacyStock?: boolean }) {
   const [open, setOpen] = useState(false);
   const path = usePathname();
   const [live, setLive] = useState<Unread & { newOrders?: Record<string, number> }>(unread);
@@ -73,13 +73,13 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
     role === "ADMIN"
       ? [["/overview", "Home", LayoutDashboard], ["/fulfillment", "Orders to ship", Truck], ["/reports", "Reports", BarChart3]]
       : role === "FULFILLMENT"
-        ? [["/gp", "Home", Gauge], ["/earnings", "Earnings", Wallet]]
+        ? [["/gp", "Home", Gauge], ["/inventory", "Inventory", Boxes], ["/earnings", "Earnings", Wallet]]
         : [["/catalog", "Price list", Package]];
   const manage: Item[] =
     role === "ADMIN"
-      ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/stock", "Stock", Boxes], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package], ["/topups", "Top-up requests", Wallet], ["/payouts", "GP payouts", Wallet], ["/users", "Users", ShieldCheck], ["/search", "Search", Search]]
+      ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ...(legacyStock ? ([["/stock", "GP stock", Boxes]] as Item[]) : []), ["/inventory", "Store inventory", Boxes], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package], ["/topups", "Top-up requests", Wallet], ["/payouts", "GP payouts", Wallet], ["/users", "Users", ShieldCheck], ["/search", "Search", Search]]
       : role === "FULFILLMENT"
-        ? [["/stock", "Stock", Boxes], ["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/catalog", "Catalog", Package], ["/search", "Search", Search]]
+        ? [...(legacyStock ? ([["/stock", "GP stock", Boxes]] as Item[]) : []), ["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/catalog", "Catalog", Package], ["/search", "Search", Search]]
         : [["/search", "Search", Search]];
   const [storeQ, setStoreQ] = useState("");
   const shownStores = stores.filter((x) => x.name.toLowerCase().includes(storeQ.trim().toLowerCase()));
