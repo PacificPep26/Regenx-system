@@ -26,7 +26,9 @@ export default async function FulfillmentOrder({ params }: { params: Promise<{ i
   return (
     <div>
       <div className="mb-3 flex items-center justify-between text-sm print:hidden">
-        <Link href="/fulfillment" className="text-navy"><ChevronLeft size={16} className="inline -mt-0.5" />Fulfillment</Link>
+        <Link href={u.role === "FULFILLMENT" ? "/gp" : "/fulfillment"} className="text-navy">
+          <ChevronLeft size={16} className="inline -mt-0.5" />{u.role === "FULFILLMENT" ? "Home" : "Fulfillment"}
+        </Link>
         <PrintButton />
       </div>
       {/* packing slip header: partner branding */}
@@ -80,7 +82,7 @@ export default async function FulfillmentOrder({ params }: { params: Promise<{ i
         showMoney={u.role === "ADMIN"}
         gpFee={u.role === "FULFILLMENT"}
         showLedger={false}
-        actions={<div className="print:hidden"><OrderActions orderId={o.id} status={o.status} role={u.role} listHref="/fulfillment" /></div>}
+        actions={<div className="print:hidden"><OrderActions orderId={o.id} status={o.status} role={u.role} listHref={u.role === "FULFILLMENT" ? "/gp" : "/fulfillment"} /></div>}
       />
     </div>
   );

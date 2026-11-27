@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -49,6 +50,27 @@ export default async function AllInventory({ searchParams }: { searchParams: Pro
           <div key={l} className="panel border-t-4 border-t-navy p-3 text-center"><div className="text-xl font-bold tabular-nums">{n}</div><div className="label mb-0">{l}</div></div>
         ))}
       </div>
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="font-semibold text-gray-500 mr-1">Store:</span>
+        <Link
+          href="/inventory"
+          className={`px-2.5 py-1 border transition-colors ${!storeSlug ? "border-navy bg-navy text-white font-semibold" : "border-line bg-white hover:bg-hover text-gray-700"}`}
+        >
+          All stores
+        </Link>
+        {stores.map((s) => {
+          const active = storeSlug === s.slug;
+          return (
+            <Link
+              key={s.slug}
+              href={`/inventory?store=${encodeURIComponent(s.slug)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              className={`px-2.5 py-1 border transition-colors ${active ? "border-navy bg-navy text-white font-semibold" : "border-line bg-white hover:bg-hover text-gray-700"}`}
+            >
+              {s.name}
+            </Link>
+          );
+        })}
+      </div>
       <FilterBar
         fields={[
           { type: "search", key: "q", placeholder: "Search product or SKU…" },
@@ -61,16 +83,28 @@ export default async function AllInventory({ searchParams }: { searchParams: Pro
             {pageGroups.map((sizes) => {
               const all = [...sizes.values()].flat();
               const name = all[0].product.name;
+              const storeMap = new Map<string, number>();
+              for (const r of all) storeMap.set(r.store.name, (storeMap.get(r.store.name) ?? 0) + r.onHand);
+              const storeBreakdown = [...storeMap.entries()];
               return (
                 <li key={name}>
                   <details className="group">
                     <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm hover:bg-hover [&::-webkit-details-marker]:hidden">
                       <ChevronDown size={14} className="shrink-0 -rotate-90 text-gray-400 transition-transform group-open:rotate-0" />
-                      <span className="min-w-0 flex-1 truncate font-semibold">
-                        {name}
+                      <div className="min-w-0 flex-1 truncate">
+                        <span className="font-semibold text-navy">{name}</span>
                         {sizes.size === 1 && <span className="font-normal text-gray-500"> {all[0].product.strength}</span>}
-                      </span>
-                      {sizes.size > 1 && <span className="shrink-0 text-xs text-gray-400">{sizes.size} sizes</span>}
+                        {sizes.size > 1 && <span className="ml-2 text-xs text-gray-400">({sizes.size} sizes)</span>}
+                        {!storeSlug && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-gray-600 font-normal">
+                            {storeBreakdown.map(([sName, qty]) => (
+                              <span key={sName} className="inline-block bg-soft border border-line px-1.5 py-0.5">
+                                <b className="text-navy">{sName}</b>: {qty}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <span className="shrink-0 text-right text-xs tabular-nums text-gray-500">
                         <b className="text-base text-navy">{sum(all, (r) => r.onHand)}</b> on hand
                       </span>

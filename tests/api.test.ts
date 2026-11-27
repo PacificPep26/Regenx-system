@@ -82,6 +82,16 @@ run("Premium order API (db)", async () => {
     expect(list.orders).toHaveLength(1);
   });
 
+  it("returns real-time stock levels for the store", async () => {
+    const { GET: GET_STOCK } = await import("@/app/api/v1/stock/route");
+    const r = await GET_STOCK(new Request("http://x/api/v1/stock", { headers: { authorization: `Bearer ${keyA}` } }));
+    expect(r.status).toBe(200);
+    const data = await r.json();
+    expect(data.store).toBe("prem");
+    expect(Array.isArray(data.items)).toBe(true);
+    expect(data.items.some((i: { sku: string }) => i.sku === "API-1")).toBe(true);
+  });
+
   it("a revoked key stops working immediately", async () => {
     await revokeApiKey(keyAId, premium);
     expect((await call(POST, keyA, order("WEB-9"))).status).toBe(401);
