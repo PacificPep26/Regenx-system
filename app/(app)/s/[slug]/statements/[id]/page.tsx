@@ -39,21 +39,21 @@ export default async function StatementPage({ params }: { params: Promise<{ slug
         <div className="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
           <div>
             {row("Previous balance", st.openingCreditCents)}
-            {row("Orders deducted", -st.debitsCents)}
+            {row("Goods cost deducted", -st.debitsCents)}
             {row("Remaining credit", st.closingCreditCents, true)}
             {row("Required balance", store.requiredBalanceCents)}
           </div>
           <div className="border-l-4 border-navy pl-3">
             {row("Replenishment required", st.replenishDueCents)}
             {row("Outstanding (overage)", st.outstandingDueCents)}
-            {row("Shipping charges", st.shippingDueCents)}
+            {row("Shipping cost", st.shippingDueCents)}
             <div className="mt-1 flex justify-between border-t border-line pt-1 text-base font-bold text-red"><span>Total due by {fmtDate(st.dueAt)}</span><Money cents={totalDue} /></div>
           </div>
         </div>
         <h3 className="label mt-6">Orders processed ({orders.length})</h3>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[480px]">
-            <thead><tr><th className="th">#</th><th className="th">Date</th><th className="th">Customer</th><th className="th text-right">Wholesale</th><th className="th text-right">Overage</th><th className="th text-right">Ship</th></tr></thead>
+            <thead><tr><th className="th">#</th><th className="th">Date</th><th className="th">Customer</th><th className="th text-right">Goods</th><th className="th text-right">Over credit</th><th className="th text-right">Ship</th></tr></thead>
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id}>

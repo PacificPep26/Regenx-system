@@ -5,6 +5,7 @@ import { ActionForm } from "@/components/ActionForm";
 import { addAdjustment, updateStore, inviteUser } from "@/app/actions/ops";
 import { UserToggle } from "./UserToggle";
 import { Money, fmtDate } from "@/components/ui";
+import { InventoryModeToggle } from "@/components/InventoryModeToggle";
 
 export default async function StoreSettings({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -46,6 +47,11 @@ export default async function StoreSettings({ params }: { params: Promise<{ slug
         </ActionForm>
           </div>
         </details>
+      </section>
+
+      <section className="panel p-3 md:p-4">
+        <h2 className="label mb-2">Inventory mode {store.inventoryMode ? "· on" : "· off"}</h2>
+        <InventoryModeToggle storeId={store.id} on={store.inventoryMode} />
       </section>
 
       <section className="panel p-3 md:p-4">

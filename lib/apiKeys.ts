@@ -52,10 +52,12 @@ export const serializeOrder = (o: FullOrder) => ({
   status: o.status,
   currency: "USD",
   wholesaleTotalCents: o.totalCents,
+  goodsCostCents: o.totalCents, // same as wholesaleTotalCents; shipping is separate and not taken from credit
   discountBps: o.discountBps,
   creditAppliedCents: o.creditAppliedCents,
   overageCents: o.overageCents,
   shippingFeeCents: o.shippingFeeCents,
+  shippingCostCents: o.shippingFeeCents,
   createdAt: o.createdAt,
   submittedAt: o.submittedAt,
   shippedAt: o.shippedAt,

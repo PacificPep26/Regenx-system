@@ -10,7 +10,7 @@ import { ProductPicker } from "./ProductPicker";
 import { formatUSD } from "@/lib/money";
 import type { CustomerInput } from "@/lib/schemas";
 
-export type PickProduct = { id: string; sku: string; sourceCode: string | null; name: string; strength: string; basePriceCents: number };
+export type PickProduct = { id: string; sku: string; sourceCode: string | null; name: string; strength: string; basePriceCents: number; /** inventory mode: units the store has left */ available?: number | null };
 export type PickCustomer = { id: string; name: string; email: string; city: string; region: string };
 type Line = { productId: string; qty: number };
 type Cust = Record<string, string>;
@@ -25,6 +25,7 @@ export function OrderForm({
   discountBps,
   creditCents,
   showMoney,
+  inventoryMode,
   draft,
 }: {
   storeId: string;
@@ -35,6 +36,8 @@ export function OrderForm({
   discountBps: number;
   creditCents: number;
   showMoney: boolean;
+  /** the store fills customer orders from its own inventory: only stocked products, no goods charge */
+  inventoryMode?: boolean;
   draft?: { id: string; items: Line[]; ship: Cust; externalRef: string; notes: string };
 }) {
   const router = useRouter();
@@ -62,7 +65,7 @@ export function OrderForm({
     const id = p.id;
     setCatalog((m) => (m.has(id) ? m : new Map(m).set(id, p)));
     setLines((ls) => {
-      const next = Math.max(0, Math.min(1_000_000, Math.floor(n) || 0));
+      const next = Math.max(0, Math.min(p.available ?? 1_000_000, Math.floor(n) || 0));
       if (next === 0) return ls.filter((l) => l.productId !== id);
       return ls.some((l) => l.productId === id) ? ls.map((l) => (l.productId === id ? { ...l, qty: next } : l)) : [...ls, { productId: id, qty: next }];
     });
@@ -153,17 +156,18 @@ export function OrderForm({
         <button type="button" className="btn-primary mb-3 w-full sm:w-auto" onClick={() => setPicking(true)}>
           <Plus size={16} /> Add products{lines.length ? ` (${lines.length})` : ""}
         </button>
-        {picking && <ProductPicker slug={slug} chosen={catalog} qty={qtyMap} setQty={setQty} net={net} showMoney={showMoney} onClose={() => setPicking(false)} />}
+        {picking && <ProductPicker slug={slug} chosen={catalog} qty={qtyMap} setQty={setQty} net={net} showMoney={showMoney} stockOnly={inventoryMode} onClose={() => setPicking(false)} />}
         <ul className="divide-y divide-line border border-line">
           {lines.map((l) => {
             const p = byId.get(l.productId);
             if (!p) return null;
             return (
-              <li key={l.productId} className="flex flex-wrap items-center gap-2 p-2 text-sm">
-                <div className="min-w-0 flex-1">
+              <li key={l.productId} className="space-y-2 p-2 text-sm sm:flex sm:items-center sm:gap-2 sm:space-y-0">
+                <div className="min-w-0 sm:flex-1">
                   <div className="font-medium">{p.name} <span className="text-gray-500">{p.strength}</span></div>
-                  <div className="text-xs text-gray-400">{p.sku}</div>
+                  <div className="break-all text-xs text-gray-400">{p.sku}</div>
                 </div>
+                <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center">
                   <button type="button" className="btn h-9 w-9 px-0" aria-label="Decrease" onClick={() => setLines((ls) => ls.map((x) => (x.productId === l.productId ? { ...x, qty: Math.max(1, x.qty - 1) } : x)))}><Minus size={16} /></button>
                   <input
@@ -171,14 +175,17 @@ export function OrderForm({
                     inputMode="numeric"
                     value={l.qty}
                     onChange={(e) => {
-                      const n = Math.max(1, Math.min(1_000_000, parseInt(e.target.value) || 1));
+                      const n = Math.max(1, Math.min(p.available ?? 1_000_000, parseInt(e.target.value) || 1));
                       setLines((ls) => ls.map((x) => (x.productId === l.productId ? { ...x, qty: n } : x)));
                     }}
                   />
-                  <button type="button" className="btn h-9 w-9 px-0" aria-label="Increase" onClick={() => setLines((ls) => ls.map((x) => (x.productId === l.productId ? { ...x, qty: Math.min(1_000_000, x.qty + 1) } : x)))}><Plus size={16} /></button>
+                  <button type="button" className="btn h-9 w-9 px-0" aria-label="Increase" onClick={() => setLines((ls) => ls.map((x) => (x.productId === l.productId ? { ...x, qty: Math.min(p.available ?? 1_000_000, x.qty + 1) } : x)))}><Plus size={16} /></button>
                 </div>
-                {showMoney && <div className="w-24 text-right tabular-nums">{formatUSD(net(p.basePriceCents * l.qty))}</div>}
-                <button type="button" className="btn h-9 px-2 text-red" aria-label="Remove" onClick={() => setLines((ls) => ls.filter((x) => x.productId !== l.productId))}><Trash2 size={16} /></button>
+                <span className="flex items-center gap-2">
+                  {showMoney && <span className="min-w-[4.5rem] text-right tabular-nums">{formatUSD(net(p.basePriceCents * l.qty))}</span>}
+                  <button type="button" className="btn h-9 px-2 text-red" aria-label="Remove" onClick={() => setLines((ls) => ls.filter((x) => x.productId !== l.productId))}><Trash2 size={16} /></button>
+                </span>
+                </div>
               </li>
             );
           })}
@@ -210,6 +217,7 @@ export function OrderForm({
               <div className={creditCents - total < 0 ? "text-red" : "text-gray-500"}>
                 Credit after: {formatUSD(creditCents - total)}
                 {creditCents - total < 0 && " · will be held for approval"}
+                {inventoryMode && creditCents - total >= 0 && " · units come from your inventory"}
               </div>
             </div>
           ) : (
@@ -218,7 +226,7 @@ export function OrderForm({
           <div className="flex shrink-0 gap-2">
             <button type="button" className="btn" disabled={pending || !lines.length} onClick={() => save(false)}>Save draft</button>
             <button type="button" className="btn-primary" disabled={pending || !lines.length || (mode === "existing" && !draft && !customerId)} onClick={() => save(true)}>
-              {pending ? "Saving…" : "Submit order"}
+              {pending ? "Saving…" : "Submit customer order"}
             </button>
           </div>
         </div>

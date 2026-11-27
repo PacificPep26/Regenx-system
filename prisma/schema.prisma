@@ -72,6 +72,9 @@ model Store {
   allowRestricted      Boolean         @default(false)
   hideAmountsFromStaff Boolean         @default(false)
   nextOrderNumber      Int             @default(1001)
+  /// true: the store buys stock up front (InventoryOrder) and customer orders are filled from that stock
+  inventoryMode        Boolean         @default(false)
+  nextInventoryNumber  Int             @default(1)
   /// approved partner branding / labeling instructions shown to GP on the packing slip
   labelNotes           String?
   insuranceStatus      InsuranceStatus @default(NONE)
@@ -83,17 +86,20 @@ model Store {
   shippingCents        Int             @default(0)
   createdAt            DateTime        @default(now())
 
-  users         User[]
-  customers     Customer[]
-  orders        Order[]
-  ledger        LedgerEntry[]
-  payments      Payment[]
-  statements    Statement[]
-  messages      Message[]
-  notifications Notification[]
-  chatReads     ChatRead[]
-  storeSeen     StoreSeen[]
-  resets        PasswordReset[]
+  users           User[]
+  customers       Customer[]
+  orders          Order[]
+  ledger          LedgerEntry[]
+  payments        Payment[]
+  statements      Statement[]
+  messages        Message[]
+  notifications   Notification[]
+  chatReads       ChatRead[]
+  storeSeen       StoreSeen[]
+  resets          PasswordReset[]
+  inventoryOrders InventoryOrder[]
+  stockItems      StoreStock[]
+  topUps          TopUpRequest[]
 }
 
 model User {
@@ -135,9 +141,11 @@ model Product {
   reserved       Int     @default(0)
   reorderLevel   Int     @default(0)
 
-  items OrderItem[]
-  stock StockMovement[]
-  docs  ProductDoc[]
+  items          OrderItem[]
+  stock          StockMovement[]
+  docs           ProductDoc[]
+  inventoryItems InventoryOrderItem[]
+  storeStock     StoreStock[]
 }
 
 model Customer {
@@ -227,23 +235,25 @@ model OrderItem {
 }
 
 model LedgerEntry {
-  id          String     @id @default(cuid())
-  storeId     String
-  store       Store      @relation(fields: [storeId], references: [id])
-  bucket      Bucket
-  type        LedgerType
+  id               String     @id @default(cuid())
+  storeId          String
+  store            Store      @relation(fields: [storeId], references: [id])
+  bucket           Bucket
+  type             LedgerType
   /// signed: + increases the bucket balance
-  amountCents Int
-  orderId     String?
-  order       Order?     @relation(fields: [orderId], references: [id])
-  paymentId   String?
-  payment     Payment?   @relation(fields: [paymentId], references: [id])
-  memo        String?
-  createdById String?
-  createdAt   DateTime   @default(now())
+  amountCents      Int
+  orderId          String?
+  order            Order?     @relation(fields: [orderId], references: [id])
+  inventoryOrderId String?
+  paymentId        String?
+  payment          Payment?   @relation(fields: [paymentId], references: [id])
+  memo             String?
+  createdById      String?
+  createdAt        DateTime   @default(now())
 
   @@index([storeId, bucket])
   @@index([orderId])
+  @@index([inventoryOrderId])
   @@index([storeId, createdAt])
 }
 
@@ -450,4 +460,114 @@ model GpPayout {
   periodTo      String?
 
   @@index([status, requestedAt])
+}
+
+enum InventoryStatus {
+  DRAFT
+  ON_HOLD
+  APPROVED
+  RECEIVED
+  CANCELLED
+}
+
+/// A store buys stock up front; GP keeps it for the store. Charged to credit like a customer order used to be.
+model InventoryOrder {
+  id                 String          @id @default(cuid())
+  storeId            String
+  store              Store           @relation(fields: [storeId], references: [id])
+  number             Int
+  status             InventoryStatus @default(DRAFT)
+  subtotalCents      Int             @default(0)
+  discountBps        Int             @default(0)
+  totalCents         Int             @default(0)
+  creditAppliedCents Int             @default(0)
+  overageCents       Int             @default(0)
+  notes              String?
+  createdAt          DateTime        @default(now())
+  submittedAt        DateTime?
+  approvedAt         DateTime?
+  receivedAt         DateTime?
+  cancelledAt        DateTime?
+
+  items InventoryOrderItem[]
+
+  @@unique([storeId, number])
+  @@index([status])
+  @@index([storeId, createdAt])
+}
+
+model InventoryOrderItem {
+  id             String         @id @default(cuid())
+  orderId        String
+  order          InventoryOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product        @relation(fields: [productId], references: [id])
+  qty            Int
+  unitPriceCents Int
+
+  @@unique([orderId, productId])
+}
+
+enum StoreStockType {
+  RECEIPT
+  ADJUST
+  RESERVE
+  RELEASE
+  SHIP
+}
+
+/// Append-only journal of one store's own stock at GP. on hand = SUM(onHandDelta), reserved = SUM(reservedDelta).
+model StoreStockMovement {
+  id               String         @id @default(cuid())
+  storeId          String
+  productId        String
+  type             StoreStockType
+  onHandDelta      Int            @default(0)
+  reservedDelta    Int            @default(0)
+  orderId          String?
+  inventoryOrderId String?
+  memo             String?
+  createdById      String?
+  createdAt        DateTime       @default(now())
+
+  @@index([storeId, productId])
+  @@index([orderId])
+  @@index([inventoryOrderId])
+}
+
+/// Cache of the journal above; maintained by a trigger, never write directly.
+model StoreStock {
+  storeId      String
+  store        Store   @relation(fields: [storeId], references: [id])
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  onHand       Int     @default(0)
+  reserved     Int     @default(0)
+  /// the owner's minimum: at or below it the store is notified once (lowNotified avoids repeats)
+  reorderLevel Int     @default(0)
+  lowNotified  Boolean @default(false)
+
+  @@id([storeId, productId])
+}
+
+enum TopUpStatus {
+  REQUESTED
+  DONE
+  DISMISSED
+}
+
+/// A partner asks the admin to add funds; the admin records the payment (lib/orders.ts recordPayment).
+model TopUpRequest {
+  id            String      @id @default(cuid())
+  storeId       String
+  store         Store       @relation(fields: [storeId], references: [id])
+  amountCents   Int
+  note          String?
+  status        TopUpStatus @default(REQUESTED)
+  requestedById String
+  createdAt     DateTime    @default(now())
+  resolvedAt    DateTime?
+
+  @@index([storeId, status])
+  @@index([status, createdAt])
 }

@@ -7,6 +7,8 @@ const STATUS_STYLE: Record<string, string> = {
   DRAFT: "border-gray-300 text-gray-600",
   ON_HOLD: "border-red text-red",
   APPROVED: "border-navy text-navy",
+  TO_STOCK: "border-navy text-navy",
+  STOCKED: "bg-ok text-white border-ok",
   PACKING: "border-warn text-warn",
   SHIPPED: "border-ok text-ok",
   DELIVERED: "bg-ok text-white border-ok",

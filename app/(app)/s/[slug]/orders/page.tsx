@@ -46,7 +46,7 @@ export default async function OrdersPage({ params, searchParams }: { params: Pro
         ]}
         right={
           <>
-            {canEdit && <Link href={`/s/${slug}/orders/new`} className="btn-primary">+ New order</Link>}
+            {canEdit && <Link href={`/s/${slug}/orders/new`} className="btn-primary">+ Add customer order</Link>}
             {canEdit && <Link href={`/s/${slug}/orders/import`} className="btn">Import CSV</Link>}
             <ViewToggle />
           </>

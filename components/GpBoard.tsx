@@ -135,7 +135,7 @@ export async function GpBoard({ searchParams, embedded = false }: { searchParams
       )}
 
       <section>
-        {queue.length ? (
+        {storeGroups.length ? (
           <div className="space-y-2">
             {storeGroups.map((g) => (
               <details key={g.id} name="gp-store" className="group border border-line">

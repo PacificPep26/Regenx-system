@@ -7,12 +7,13 @@ import { audit } from "./audit";
 import { notify } from "./notify";
 import { formatUSD } from "./money";
 import { reserveOrder, releaseOrder, shipFromStock, StockError } from "./stock";
+import { assertStoreStock, reserveStoreStock, releaseStoreStock, shipStoreStock, storeReserved } from "./storeStock";
 
 export class UserError extends Error {}
 
 type Actor = { id: string; role: string };
 
-const lockStore = (tx: Tx, storeId: string) => tx.$queryRaw`SELECT id FROM "Store" WHERE id = ${storeId} FOR UPDATE`;
+export const lockStore = (tx: Tx, storeId: string) => tx.$queryRaw`SELECT id FROM "Store" WHERE id = ${storeId} FOR UPDATE`;
 
 export const regionAllowed = (allowed: string[], country: string, region: string) =>
   allowed.includes(country.toUpperCase()) || allowed.includes(`${country}-${region}`.toUpperCase());
@@ -46,6 +47,9 @@ export function submitOrder(orderId: string, actor: Actor) {
       store.discountBps,
     );
     const bal = await getBalances(store.id, { tx });
+    // inventory mode: units come from the store's own stock at GP, but the cost of goods is charged now, like any order
+    const inv = store.inventoryMode;
+    if (inv) await assertStoreStock(tx, store.id, order.items, (m) => new UserError(m));
     const { creditAppliedCents, overageCents } = splitCharge(bal.CREDIT, totalCents);
     // Program rule: with an unsettled statement RegenX may limit *additional* fulfillment (beyond the prepaid credit);
     // orders fully covered by credit still go through.
@@ -76,14 +80,17 @@ export function submitOrder(orderId: string, actor: Actor) {
         approvedAt: status === "APPROVED" ? now : null,
       },
     });
-    if (status === "APPROVED") await reserveOrder(tx, orderId, actor.id);
+    if (status === "APPROVED") {
+      if (inv) await reserveStoreStock(tx, store.id, orderId, order.items, actor.id, (m) => new UserError(m));
+      else await reserveOrder(tx, orderId, actor.id);
+    }
     const link = `/s/${store.slug}/orders/${orderId}`;
     if (status === "ON_HOLD") {
       await notify(tx, { audience: "ADMIN", storeId: store.id, title: `${store.name}: order #${order.number} over credit by ${formatUSD(overageCents)}`, link });
       await notify(tx, { audience: "STORE", storeId: store.id, title: `Order #${order.number} on hold: exceeds credit by ${formatUSD(overageCents)}`, link });
     } else {
-      await notify(tx, { audience: "ADMIN", storeId: store.id, title: `New order ${store.name} #${order.number} · ${formatUSD(totalCents)}`, link });
-      await notify(tx, { audience: "FULFILLMENT", storeId: store.id, title: `New order ${store.name} #${order.number}`, link: `/fulfillment/${orderId}` });
+      await notify(tx, { audience: "ADMIN", storeId: store.id, title: `New customer order ${store.name} #${order.number} · ${formatUSD(totalCents)}`, link });
+      await notify(tx, { audience: "FULFILLMENT", storeId: store.id, title: `New customer order ${store.name} #${order.number}`, link: `/fulfillment/${orderId}` });
     }
     await audit(tx, actor.id, "order.submit", "Order", orderId, { status, totalCents, creditAppliedCents, overageCents });
     return status;
@@ -95,9 +102,12 @@ export function approveHold(orderId: string, actor: Actor) {
     const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { store: true } });
     if (o.status !== "ON_HOLD") throw new UserError("Order is not on hold.");
     await tx.order.update({ where: { id: orderId }, data: { status: "APPROVED", approvedAt: new Date() } });
-    await reserveOrder(tx, orderId, actor.id);
+    if (o.store.inventoryMode) {
+      const items = await tx.orderItem.findMany({ where: { orderId }, include: { product: true } });
+      await reserveStoreStock(tx, o.storeId, orderId, items, actor.id, (m) => new UserError(m));
+    } else await reserveOrder(tx, orderId, actor.id);
     await notify(tx, { audience: "STORE", storeId: o.storeId, title: `Order #${o.number} approved (overage billed next statement)`, link: `/s/${o.store.slug}/orders/${orderId}` });
-    await notify(tx, { audience: "FULFILLMENT", storeId: o.storeId, title: `New order ${o.store.name} #${o.number}`, link: `/fulfillment/${orderId}` });
+    await notify(tx, { audience: "FULFILLMENT", storeId: o.storeId, title: `New customer order ${o.store.name} #${o.number}`, link: `/fulfillment/${orderId}` });
     await audit(tx, actor.id, "order.approve_hold", "Order", orderId);
   });
 }
@@ -117,6 +127,7 @@ export function cancelOrder(orderId: string, actor: Actor, reason?: string) {
         await tx.ledgerEntry.create({ data: { storeId: o.storeId, ...e, orderId, createdById: actor.id, memo: `Cancel #${o.number}` } });
     await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED", cancelledAt: new Date(), notes: reason ? `${o.notes ?? ""}\nCancelled: ${reason}`.trim() : o.notes } });
     await releaseOrder(tx, orderId, actor.id);
+    await releaseStoreStock(tx, o.storeId, orderId, actor.id);
     const link = `/s/${o.store.slug}/orders/${orderId}`;
     if (o.status !== "DRAFT") {
       await notify(tx, { audience: actor.role === "ADMIN" ? "STORE" : "ADMIN", storeId: o.storeId, title: `Order #${o.number} cancelled`, body: reason, link });
@@ -142,7 +153,11 @@ export function markShipped(orderId: string, actor: Actor, s: { carrier: string;
     if (o.status !== "PACKING" && o.status !== "APPROVED") throw new UserError("Order is not ready to ship.");
     if (s.shippingFeeCents < 0) throw new UserError("Shipping fee cannot be negative.");
     try {
-      await shipFromStock(tx, orderId, actor.id);
+      // an order reserved from the store's own stock ships from it; anything else uses the GP warehouse stock as before
+      if ((await storeReserved(tx, orderId)).size) {
+        await lockStore(tx, o.storeId);
+        await shipStoreStock(tx, o.storeId, orderId, actor.id);
+      } else await shipFromStock(tx, orderId, actor.id);
     } catch (e) {
       if (e instanceof StockError) throw new UserError(e.message);
       throw e;

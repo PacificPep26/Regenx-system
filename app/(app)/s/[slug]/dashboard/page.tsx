@@ -9,6 +9,7 @@ import { dateRange, flat, pageOf, str, type SP } from "@/lib/query";
 import { FilterBar } from "@/components/FilterBar";
 import { Badge, Empty, Money, Pager, fmtDate } from "@/components/ui";
 import { orderSelect } from "@/components/OrderViews";
+import { TopUpButton } from "@/components/TopUpButton";
 
 const LIVE = { notIn: ["DRAFT", "CANCELLED"] as ("DRAFT" | "CANCELLED")[] };
 const STATUSES = ["ON_HOLD", "APPROVED", "PACKING", "SHIPPED", "DELIVERED"] as const;
@@ -18,20 +19,35 @@ const DAY = 86400000;
 export default async function StoreDashboard({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<SP> }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const { store, canSeeMoney, canSeePrices, canEdit } = await requireStore(slug);
+  const { user, store, canSeeMoney, canSeePrices, canEdit } = await requireStore(slug);
   const now = Date.now();
   const range = dateRange(sp, "from", "to");
   const q = str(sp, "q")?.toLowerCase();
 
-  const [bal, byStatus, w7, w30, lastStmt, recent] = await Promise.all([
+  // this Monday-to-Monday week (New York): the same period the next statement will cover
+  const week = statementPeriod(new Date(now + 7 * DAY));
+  const [bal, byStatus, w7, w30, lastStmt, recent, weekLedger, invRows] = await Promise.all([
     getBalances(store.id),
     db.order.groupBy({ by: ["status"], where: { storeId: store.id }, _count: true }),
     db.order.aggregate({ where: { storeId: store.id, status: LIVE, submittedAt: { gte: new Date(now - 7 * DAY) } }, _sum: { totalCents: true }, _count: true }),
     db.order.aggregate({ where: { storeId: store.id, status: LIVE, submittedAt: { gte: new Date(now - 30 * DAY) } }, _sum: { totalCents: true }, _count: true }),
     db.statement.findFirst({ where: { storeId: store.id }, orderBy: { periodStart: "desc" } }),
     db.order.findMany({ where: { storeId: store.id }, orderBy: { createdAt: "desc" }, take: 5, select: orderSelect }),
+    canSeeMoney
+      ? db.ledgerEntry.groupBy({ by: ["bucket", "type"], where: { storeId: store.id, createdAt: { gte: week.periodStart, lt: week.periodEnd }, type: { in: ["ORDER_DEBIT", "ORDER_REFUND", "OVERAGE", "OVERAGE_REVERSAL", "SHIPPING_CHARGE", "ADJUSTMENT"] } }, _sum: { amountCents: true } })
+      : Promise.resolve([]),
+    store.inventoryMode
+      ? db.$queryRaw<{ units: number; value: bigint }[]>`SELECT COALESCE(SUM(ss."onHand" - ss."reserved"), 0)::int AS units, COALESCE(SUM((ss."onHand" - ss."reserved") * p."basePriceCents"), 0)::bigint AS value FROM "StoreStock" ss JOIN "Product" p ON p.id = ss."productId" WHERE ss."storeId" = ${store.id}`
+      : Promise.resolve([]),
   ]);
+  const sumOf = (bucket: string, types: string[]) => weekLedger.filter((r) => r.bucket === bucket && types.includes(r.type)).reduce((n, r) => n + (r._sum.amountCents ?? 0), 0);
+  // cost of goods = what orders took from credit (+ what went over credit), net of cancellations
+  const weekGoods = -sumOf("CREDIT", ["ORDER_DEBIT", "ORDER_REFUND"]) + sumOf("OUTSTANDING", ["OVERAGE", "OVERAGE_REVERSAL"]);
+  const weekShipping = sumOf("SHIPPING", ["SHIPPING_CHARGE", "ADJUSTMENT"]);
+  const invUnits = invRows[0]?.units ?? 0;
+  const invValue = Math.round((Number(invRows[0]?.value ?? 0) * (10000 - store.discountBps)) / 10000);
 
+  const topUpPending = user.role === "PARTNER_OWNER" ? (await db.topUpRequest.count({ where: { storeId: store.id, status: "REQUESTED" } })) > 0 : false;
   const counts = Object.fromEntries(byStatus.map((g) => [g.status, g._count]));
   const pctRaw = store.requiredBalanceCents ? (bal.CREDIT / store.requiredBalanceCents) * 100 : 0;
   const pct = Math.max(0, Math.min(100, pctRaw));
@@ -72,48 +88,48 @@ export default async function StoreDashboard({ params, searchParams }: { params:
   // keep the stats section open while the user is filtering/paging it
   const statsOpen = !!q || !!range || page > 1;
 
-  const alerts: { tone: "red" | "warn"; text: React.ReactNode; href?: string }[] = [];
-  if (canSeeMoney && replenish > 0) alerts.push({ tone: lastStmt?.status === "OVERDUE" ? "red" : "warn", text: <>Replenish <b><Money cents={replenish} /></b> to restore your deposit · by {fmtDate(dueDate)}</>, href: `${base}/statements` });
-  if (canSeeMoney && bal.OUTSTANDING > 0) alerts.push({ tone: "red", text: <>Outstanding overage <b><Money cents={bal.OUTSTANDING} /></b> is due</>, href: `${base}/ledger` });
-  if (onHold > 0) alerts.push({ tone: "red", text: <><b>{onHold}</b> order(s) on hold, waiting for approval</>, href: `${base}/orders?status=ON_HOLD` });
-
   return (
     <div className="space-y-4">
-      {alerts.length > 0 && (
-        <ul className="space-y-1">
-          {alerts.map((a, i) => (
-            <li key={i} className={`border-l-4 bg-white px-3 py-2 text-sm ${a.tone === "red" ? "border-red bg-red/5" : "border-warn bg-warn/5"}`}>
-              {a.href ? <Link href={a.href} className="hover:underline">{a.text}</Link> : a.text}
-            </li>
-          ))}
-        </ul>
-      )}
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* 1. what needs attention: deposit + order pipeline */}
         <section className="panel p-3 lg:col-span-2">
           {canSeeMoney && (
             <>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2">
                 <div className="min-w-0">
                   <div className="label mb-0 text-[10px]">Deposit</div>
                   <div className="text-xl font-bold text-navy md:text-2xl">
                     <Money cents={bal.CREDIT} /> <span className="text-xs font-normal text-gray-500">of <Money cents={store.requiredBalanceCents} /></span>
                   </div>
                 </div>
-                {canEdit && <Link href={`${base}/orders/new`} className="btn-primary shrink-0">+ New order</Link>}
+                {canEdit && (
+                  <div className="flex w-full gap-2 sm:w-auto">
+                    {store.inventoryMode && <Link href={`${base}/inventory?add=1`} className="btn h-9 flex-1 justify-center px-2 text-xs sm:h-10 sm:flex-none sm:px-4 sm:text-sm">+ Add inventory</Link>}
+                    <Link href={`${base}/orders/new`} className="btn-primary h-9 flex-1 justify-center px-2 text-xs sm:h-10 sm:flex-none sm:px-4 sm:text-sm">+ Add customer order</Link>
+                  </div>
+                )}
               </div>
               <div className="mt-2 h-2 w-full border border-line bg-soft" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="Credit remaining">
                 <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
               </div>
-              <dl className="mt-2 grid grid-cols-3 gap-x-3 text-sm">
-                <Fact label="To replenish" tone={replenish > 0 ? "red" : "ok"}><Money cents={replenish} /></Fact>
-                <Fact label="Outstanding" tone={bal.OUTSTANDING > 0 ? "red" : "line"}><Money cents={bal.OUTSTANDING} /></Fact>
-                <Fact label="Shipping due" tone={bal.SHIPPING > 0 ? "red" : "line"}><Money cents={bal.SHIPPING} /></Fact>
+              {(replenish > 0 || bal.OUTSTANDING > 0 || bal.SHIPPING > 0) && (
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-xs sm:text-sm">
+                  <span className="min-w-0">
+                    {replenish > 0 && <><b><Money cents={replenish} /></b> to restore your deposit by {fmtDate(dueDate)}</>}
+                    {bal.OUTSTANDING > 0 && <Link href={`${base}/ledger`} className="ml-2 border border-red px-1.5 py-0.5 text-[11px] font-semibold text-red">Over credit <Money cents={bal.OUTSTANDING} /></Link>}
+                    {bal.SHIPPING > 0 && <Link href={`${base}/ledger`} className="ml-2 border border-red px-1.5 py-0.5 text-[11px] font-semibold text-red">Shipping due <Money cents={bal.SHIPPING} /></Link>}
+                  </span>
+                  {user.role === "PARTNER_OWNER" && <TopUpButton className="h-8 px-2 text-xs" storeId={store.id} suggested={Math.max(replenish, bal.OUTSTANDING + bal.SHIPPING)} pending={topUpPending} />}
+                </div>
+              )}
+              <dl className="mt-2 grid grid-cols-3 gap-x-2 text-sm sm:gap-x-3">
+                {store.inventoryMode && <Fact label="Inventory" tone="line">{invUnits}u · <Money cents={invValue} /></Fact>}
+                <Fact label="Goods / week" tone="line"><Money cents={weekGoods} /></Fact>
+                <Fact label="Shipping / week" tone="line"><Money cents={weekShipping} /></Fact>
               </dl>
             </>
           )}
-          {!canSeeMoney && canEdit && <Link href={`${base}/orders/new`} className="btn-primary mb-3">+ New order</Link>}
+          {!canSeeMoney && canEdit && <Link href={`${base}/orders/new`} className="btn-primary mb-3">+ Add customer order</Link>}
           <div className={`grid grid-cols-5 gap-1 text-center ${canSeeMoney ? "mt-3 border-t border-line pt-3" : ""}`}>
             {STATUSES.map((s) => (
               <Link key={s} href={`${base}/orders?status=${s}`} className="px-0.5 py-1 hover:bg-hover">
@@ -130,16 +146,26 @@ export default async function StoreDashboard({ params, searchParams }: { params:
           {!recent.length ? (
             <Empty>No orders yet.</Empty>
           ) : (
-            <ul className="divide-y divide-line border border-line">
-              {recent.slice(0, 5).map((o) => (
-                <li key={o.id}>
-                  <Link href={`${base}/orders/${o.id}`} className="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-hover">
-                    <span className="min-w-0 truncate"><b className="text-navy">#{o.number}</b> {o.customer.name}</span>
-                    <span className="flex shrink-0 items-center gap-2"><Badge value={o.status} />{canSeePrices && <Money cents={o.totalCents} className="text-xs" />}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <div className="border border-line">
+              {canSeePrices && (
+                <div className="grid grid-cols-[1fr_5.5rem_3.75rem_3.25rem] gap-2 border-b border-line bg-soft px-3 py-1 text-[9px] font-semibold uppercase tracking-wide text-gray-500">
+                  <span>Order</span><span className="justify-self-end">Status</span><span className="justify-self-end">Goods</span><span className="justify-self-end">Ship</span>
+                </div>
+              )}
+              <ul className="divide-y divide-line">
+                {recent.slice(0, 5).map((o) => (
+                  <li key={o.id}>
+                    {/* fixed columns so statuses and amounts line up row to row */}
+                    <Link href={`${base}/orders/${o.id}`} className={`grid items-center gap-2 px-3 py-2 text-sm hover:bg-hover ${canSeePrices ? "grid-cols-[1fr_5.5rem_3.75rem_3.25rem]" : "grid-cols-[1fr_5.5rem]"}`}>
+                      <span className="min-w-0 truncate"><b className="text-navy">#{o.number}</b> {o.customer.name}</span>
+                      <span className="justify-self-end"><Badge value={o.status} /></span>
+                      {canSeePrices && <Money cents={o.totalCents} className="justify-self-end text-right text-xs" />}
+                      {canSeePrices && (o.shippingFeeCents != null ? <Money cents={o.shippingFeeCents} className="justify-self-end text-right text-xs text-gray-600" /> : <span className="justify-self-end text-xs text-gray-300">—</span>)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
       </div>
@@ -216,8 +242,8 @@ function Fact({ label, tone, children }: { label: string; tone: "red" | "ok" | "
   const border = { red: "border-red", ok: "border-ok", line: "border-line" }[tone];
   return (
     <div className={`border-l-4 ${border} pl-2`}>
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
-      <dd className="font-semibold">{children}</dd>
+      <dt className="text-[9px] font-semibold uppercase leading-tight tracking-wide text-gray-500 sm:text-[10px]">{label}</dt>
+      <dd className="text-xs font-semibold sm:text-sm">{children}</dd>
     </div>
   );
 }

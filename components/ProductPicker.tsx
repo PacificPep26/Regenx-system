@@ -6,7 +6,7 @@ import { Flame, Minus, Plus, Search, X } from "lucide-react";
 import { formatUSD } from "@/lib/money";
 import type { PickProduct } from "./OrderForm";
 
-type Item = PickProduct & { hits?: number; flag?: "out" | "low" | null };
+type Item = PickProduct & { hits?: number; flag?: "out" | "low" | null; available?: number | null };
 type Page = { popular: Item[]; items: Item[]; hasMore: boolean };
 
 /**
@@ -20,6 +20,7 @@ export function ProductPicker({
   setQty,
   net,
   showMoney,
+  stockOnly,
   onClose,
 }: {
   slug: string;
@@ -28,6 +29,8 @@ export function ProductPicker({
   setQty: (p: PickProduct, n: number) => void;
   net: (cents: number) => number;
   showMoney: boolean;
+  /** inventory mode: list only what the store has in its own stock */
+  stockOnly?: boolean;
   onClose: () => void;
 }) {
   const [q, setQ] = useState("");
@@ -44,7 +47,7 @@ export function ProductPicker({
     const my = ++seq.current;
     setLoading(true);
     try {
-      const r = await fetch(`/api/store/${slug}/products?q=${encodeURIComponent(text)}&page=${p}`, { cache: "no-store" });
+      const r = await fetch(`/api/store/${slug}/products?q=${encodeURIComponent(text)}&page=${p}${stockOnly ? "&stock=1" : ""}`, { cache: "no-store" });
       if (!r.ok || my !== seq.current) return;
       const d: Page = await r.json();
       setPopular(p === 0 ? d.popular : []);
@@ -54,7 +57,7 @@ export function ProductPicker({
     } finally {
       if (my === seq.current) setLoading(false);
     }
-  }, [slug]);
+  }, [slug, stockOnly]);
 
   useEffect(() => {
     const t = setTimeout(() => load(q.trim(), 0), q ? 250 : 0);
@@ -85,7 +88,8 @@ export function ProductPicker({
           <div className="truncate font-medium">{p.name} <span className="font-normal text-gray-500">{p.strength}</span></div>
           <div className="flex items-center gap-2 truncate text-xs text-gray-400">
             {p.sku}
-            {p.flag && (
+            {p.available != null && <span className="shrink-0 border border-navy px-1 text-[10px] font-semibold uppercase text-navy">{p.available} in stock</span>}
+            {!stockOnly && p.flag && (
               <span className={`shrink-0 border px-1 text-[10px] font-semibold uppercase ${p.flag === "out" ? "border-red text-red" : "border-warn text-warn"}`}>
                 {p.flag === "out" ? "out of stock" : "low stock"}
               </span>

@@ -8,6 +8,7 @@ export type OrderRow = {
   status: string;
   createdAt: Date;
   totalCents: number;
+  shippingFeeCents: number | null;
   shipRegion: string;
   trackingNo: string | null;
   carrier: string | null;
@@ -34,6 +35,7 @@ export function OrderTable({ rows, href, showMoney, showStore }: { rows: OrderRo
                 <span className="truncate">{o.customer.name}</span>
                 <Money cents={o.totalCents} show={showMoney} className="font-semibold" />
               </div>
+              {showMoney && o.shippingFeeCents != null && <div className="text-right text-xs text-gray-500">+ shipping <Money cents={o.shippingFeeCents} /></div>}
               <div className="mt-0.5 text-xs text-gray-500">
                 {fmtDate(o.createdAt)} · {o._count.items} item(s) · {o.shipRegion}
                 {o.trackingNo ? ` · ${o.carrier} ${o.trackingNo}` : ""}
@@ -55,7 +57,8 @@ export function OrderTable({ rows, href, showMoney, showStore }: { rows: OrderRo
               <th className="th">Ship to</th>
               <th className="th">Ref</th>
               <th className="th">Tracking</th>
-              <th className="th text-right">Total</th>
+              <th className="th text-right">Goods</th>
+              {showMoney && <th className="th text-right">Shipping</th>}
             </tr>
           </thead>
           <tbody>
@@ -70,6 +73,7 @@ export function OrderTable({ rows, href, showMoney, showStore }: { rows: OrderRo
                 <td className="td text-gray-500">{o.externalRef ?? "—"}</td>
                 <td className="td text-xs">{o.trackingNo ? `${o.carrier} ${o.trackingNo}` : "—"}</td>
                 <td className="td text-right font-semibold"><Money cents={o.totalCents} show={showMoney} /></td>
+                {showMoney && <td className="td text-right text-gray-600"><Money cents={o.shippingFeeCents} /></td>}
               </tr>
             ))}
           </tbody>
@@ -98,6 +102,7 @@ export function OrderBoard({ rows, href, showMoney, showStore, statuses = ORDER_
                     <Money cents={o.totalCents} show={showMoney} />
                   </div>
                   <div className="truncate">{o.customer.name}</div>
+                  {showMoney && o.shippingFeeCents != null && <div className="text-xs text-gray-500">+ shipping <Money cents={o.shippingFeeCents} /></div>}
                   <div className="text-xs text-gray-500">{showStore && o.store ? `${o.store.name} · ` : ""}{fmtDate(o.createdAt)}</div>
                 </Link>
               ))}
@@ -115,6 +120,7 @@ export const orderSelect = {
   status: true,
   createdAt: true,
   totalCents: true,
+  shippingFeeCents: true,
   shipRegion: true,
   trackingNo: true,
   carrier: true,

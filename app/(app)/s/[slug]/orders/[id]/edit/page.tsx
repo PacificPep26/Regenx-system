@@ -17,6 +17,7 @@ export default async function EditDraftPage({ params }: { params: Promise<{ slug
     <div className="max-w-4xl">
       <PageHeader title={`Edit draft #${o.number}`} />
       <OrderForm
+        inventoryMode={store.inventoryMode}
         storeId={store.id}
         slug={slug}
         lineProducts={lineProducts}

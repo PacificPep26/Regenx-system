@@ -12,7 +12,8 @@ export default async function StoreLayout({ children, params }: { children: Reac
   const base = `/s/${slug}`;
   const tabs: ([string, string] | [string, string, string[]])[] = [
     [`${base}/dashboard`, "Dashboard"],
-    [`${base}/orders`, "Orders"],
+    [`${base}/orders`, "Customer orders"],
+    ...(store.inventoryMode ? ([[`${base}/inventory`, "Inventory"]] as [string, string][]) : []),
     [`${base}/customers`, "Customers"],
   ];
   // money pages live under one "Account" tab with a small second row

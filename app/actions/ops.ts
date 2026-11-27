@@ -133,7 +133,7 @@ export async function createStore(_: CreateStoreState, form: FormData): Promise<
   try {
     await db.$transaction(async (tx) => {
       const s = await tx.store.create({
-        data: { name: d.name, slug: d.slug, tier: d.tier, ...TIERS[d.tier], allowedRegions: d.regions, status: d.depositReceived ? "ACTIVE" : "PENDING" },
+        data: { name: d.name, slug: d.slug, tier: d.tier, ...TIERS[d.tier], allowedRegions: d.regions, status: d.depositReceived ? "ACTIVE" : "PENDING", inventoryMode: true },
       });
       if (d.depositReceived)
         await tx.ledgerEntry.create({ data: { storeId: s.id, bucket: "CREDIT", type: "DEPOSIT", amountCents: s.requiredBalanceCents, memo: "Initial deposit", createdById: u.id } });

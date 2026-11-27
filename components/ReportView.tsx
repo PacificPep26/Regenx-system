@@ -46,8 +46,8 @@ export async function ReportView({ sp, scope, basePath, withStoreFilter }: { sp:
       <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4 md:gap-2">
         <div className="panel border-l-4 border-navy p-2 md:p-3"><div className="label mb-0 text-[10px]">Orders</div><div className="text-lg font-bold">{total.orders}</div></div>
         <div className="panel border-l-4 border-navy p-2 md:p-3"><div className="label mb-0 text-[10px]">Units</div><div className="text-lg font-bold">{total.units}</div></div>
-        <div className="panel border-l-4 border-ok p-2 md:p-3"><div className="label mb-0 text-[10px]">Wholesale</div><div className="text-lg font-bold"><Money cents={total.wholesale} /></div></div>
-        <div className="panel border-l-4 border-line p-2 md:p-3"><div className="label mb-0 text-[10px]">Shipping billed</div><div className="text-lg font-bold"><Money cents={total.shipping} /></div></div>
+        <div className="panel border-l-4 border-ok p-2 md:p-3"><div className="label mb-0 text-[10px]">Goods cost</div><div className="text-lg font-bold"><Money cents={total.wholesale} /></div></div>
+        <div className="panel border-l-4 border-line p-2 md:p-3"><div className="label mb-0 text-[10px]">Shipping cost</div><div className="text-lg font-bold"><Money cents={total.shipping} /></div></div>
       </div>
 
       {!rows.length ? (
@@ -55,7 +55,7 @@ export async function ReportView({ sp, scope, basePath, withStoreFilter }: { sp:
       ) : (
         <div className="overflow-x-auto border border-line">
           <table className="w-full sm:min-w-[520px]">
-            <thead><tr><th className="th">{unit === "day" ? "Day" : "Month"}</th><th className="th text-right">Orders</th><th className="th text-right">Units</th><th className="th w-1/3">Wholesale</th><th className="th text-right">Shipping</th></tr></thead>
+            <thead><tr><th className="th">{unit === "day" ? "Day" : "Month"}</th><th className="th text-right">Orders</th><th className="th text-right">Units</th><th className="th w-1/3">Goods cost</th><th className="th text-right">Shipping cost</th></tr></thead>
             <tbody>
               {rows.map((x) => (
                 <tr key={x.period.toISOString()} className="hover:bg-hover">

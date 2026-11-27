@@ -77,13 +77,16 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
         : [["/catalog", "Price list", Package]];
   const manage: Item[] =
     role === "ADMIN"
-      ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/stock", "Stock", Boxes], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package], ["/payouts", "GP payouts", Wallet], ["/users", "Users", ShieldCheck], ["/search", "Search", Search]]
+      ? [["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/stock", "Stock", Boxes], ["/statements", "Statements", FileText], ["/catalog", "Catalog", Package], ["/topups", "Top-up requests", Wallet], ["/payouts", "GP payouts", Wallet], ["/users", "Users", ShieldCheck], ["/search", "Search", Search]]
       : role === "FULFILLMENT"
         ? [["/stock", "Stock", Boxes], ["/stores", "Stores", Store], ["/customers", "Customers", Contact], ["/catalog", "Catalog", Package], ["/search", "Search", Search]]
         : [["/search", "Search", Search]];
   const [storeQ, setStoreQ] = useState("");
   const shownStores = stores.filter((x) => x.name.toLowerCase().includes(storeQ.trim().toLowerCase()));
   const storeAlerts = stores.reduce((n, x) => n + (live.newOrders?.[x.id] ?? x.newOrders), 0);
+  // a partner has one store: no collapsible "Stores" group, just the link
+  const isPartner = role.startsWith("PARTNER");
+  const Wrap: React.ElementType = isPartner ? "div" : "details";
   const manageActive = manage.some(([h]) => path === h || path.startsWith(h + "/"));
 
   const link = ([href, label, Icon]: Item, indent = false, count = 0) => {
@@ -131,7 +134,8 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
         <nav className="min-h-0 flex-1 overflow-y-auto py-2">
           {primary.map((it) => link(it))}
           {stores.length > 0 && (
-            <details open className="group mt-2">
+            <Wrap {...(isPartner ? {} : { open: true })} className="group mt-2">
+              {!isPartner && (
               <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 hover:bg-hover [&::-webkit-details-marker]:hidden">
                 <span>Stores · {totalStores}</span>
                 <span className="flex items-center gap-2">
@@ -139,6 +143,7 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
                   <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
                 </span>
               </summary>
+              )}
               {stores.length > 5 && (
                 <div className="px-3 pb-1">
                   <input type="search" className="input h-8 text-xs" placeholder="Filter stores…" value={storeQ} onChange={(e) => setStoreQ(e.target.value)} aria-label="Filter stores" />
@@ -167,7 +172,7 @@ export function Nav({ role, userName, stores, totalStores = stores.length, unrea
               {(role === "ADMIN" || role === "FULFILLMENT") && totalStores > stores.length && (
                 <Link href="/stores" className="block px-4 py-2 text-sm font-medium text-navy hover:bg-hover">All stores ({totalStores}) →</Link>
               )}
-            </details>
+            </Wrap>
           )}
         </nav>
         <div className="shrink-0 border-t border-line py-2">

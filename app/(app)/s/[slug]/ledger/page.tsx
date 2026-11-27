@@ -9,6 +9,7 @@ import { Empty, Money, Pager } from "@/components/ui";
 import { viewsFor } from "@/lib/views";
 
 const BUCKETS = ["CREDIT", "OUTSTANDING", "SHIPPING"] as const;
+const BUCKET_LABEL = { CREDIT: "Goods (credit)", OUTSTANDING: "Over credit", SHIPPING: "Shipping" } as const;
 const TYPES = ["DEPOSIT", "ORDER_DEBIT", "ORDER_REFUND", "OVERAGE", "OVERAGE_REVERSAL", "SHIPPING_CHARGE", "PAYMENT", "ADJUSTMENT"] as const;
 
 export default async function LedgerPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<SP> }) {
@@ -48,7 +49,7 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
         views={views}
         fields={[
           { type: "search", key: "q", placeholder: "Search memo or order #…" },
-          { type: "multi", key: "bucket", label: "Bucket", options: BUCKETS.map((b) => ({ value: b, label: b })) },
+          { type: "multi", key: "bucket", label: "Bucket", options: BUCKETS.map((b) => ({ value: b, label: BUCKET_LABEL[b] })) },
           { type: "multi", key: "type", label: "Type", options: TYPES.map((t) => ({ value: t, label: t.replace("_", " ") })) },
           { type: "date", from: "from", to: "to", label: "Date" },
           { type: "range", min: "min", max: "max", label: "Amount" },
@@ -58,7 +59,19 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
       {!rows.length ? (
         <Empty>No entries.</Empty>
       ) : (
-        <div className="overflow-x-auto border border-line">
+        <>
+        <ul className="divide-y divide-line border border-line md:hidden">
+          {rows.map((e) => (
+            <li key={e.id} className="flex items-start justify-between gap-3 p-3 text-sm">
+              <div className="min-w-0">
+                <div className="text-xs text-gray-500">{e.createdAt.toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} · {e.type.replace("_", " ")} · {BUCKET_LABEL[e.bucket]}</div>
+                <div className="mt-0.5 break-words">{e.order ? <Link className="text-navy underline" href={`/s/${slug}/orders/${e.order.id}`}>#{e.order.number}</Link> : null} {e.memo}</div>
+              </div>
+              <Money cents={e.amountCents} className={`shrink-0 font-semibold ${e.amountCents > 0 ? "text-ok" : ""}`} />
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto border border-line md:block">
           <table className="w-full min-w-[560px]">
             <thead>
               <tr><th className="th">Date</th><th className="th">Type</th><th className="th">Bucket</th><th className="th">Memo</th><th className="th text-right">Amount</th></tr>
@@ -68,7 +81,7 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
                 <tr key={e.id}>
                   <td className="td whitespace-nowrap text-xs">{e.createdAt.toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                   <td className="td text-xs font-semibold">{e.type.replace("_", " ")}</td>
-                  <td className="td text-xs">{e.bucket}</td>
+                  <td className="td text-xs">{BUCKET_LABEL[e.bucket]}</td>
                   <td className="td text-sm">{e.order ? <Link className="text-navy underline" href={`/s/${slug}/orders/${e.order.id}`}>#{e.order.number}</Link> : null} {e.memo}</td>
                   <td className="td text-right font-semibold"><Money cents={e.amountCents} className={e.amountCents > 0 ? "text-ok" : ""} /></td>
                 </tr>
@@ -76,6 +89,7 @@ export default async function LedgerPage({ params, searchParams }: { params: Pro
             </tbody>
           </table>
         </div>
+        </>
       )}
       <Pager page={page} pages={Math.ceil(count / take)} params={flat(sp)} />
     </div>

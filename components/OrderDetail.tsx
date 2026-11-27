@@ -30,7 +30,7 @@ export function OrderDetail({ o, showMoney, customerHref, actions, showLedger, g
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-lg font-bold text-navy">Order #{o.number}</h2>
+        <h2 className="text-lg font-bold text-navy">Customer order #{o.number}</h2>
         <Badge value={o.status} />
         {o.externalRef && <span className="text-sm text-gray-500">Ref {o.externalRef}</span>}
       </div>
@@ -60,14 +60,28 @@ export function OrderDetail({ o, showMoney, customerHref, actions, showLedger, g
             </dl>
           )}
           {showMoney && o.status !== "DRAFT" && (
-            <dl className="mt-2 space-y-1 border-t border-line pt-2 text-sm">
-              <Row k="Subtotal" v={<Money cents={o.subtotalCents} />} />
-              <Row k={`Discount ${o.discountBps / 100}%`} v={<Money cents={o.totalCents - o.subtotalCents} />} />
-              <Row k={<b>Wholesale total</b>} v={<b><Money cents={o.totalCents} /></b>} />
-              <Row k="From credit" v={<Money cents={o.creditAppliedCents} />} />
-              {o.overageCents > 0 && <Row k={<span className="text-red">Overage (outstanding)</span>} v={<Money cents={o.overageCents} className="text-red" />} />}
-              {o.shippingFeeCents != null && <Row k="Shipping (billed separately)" v={<Money cents={o.shippingFeeCents} />} />}
-            </dl>
+            <>
+              <h3 className="label mt-3 border-t border-line pt-2">Goods cost</h3>
+              <dl className="space-y-1 text-sm">
+                <Row k="Subtotal" v={<Money cents={o.subtotalCents} />} />
+                <Row k={`Discount ${o.discountBps / 100}%`} v={<Money cents={o.totalCents - o.subtotalCents} />} />
+                <Row k={<b>Goods total</b>} v={<b><Money cents={o.totalCents} /></b>} />
+                <Row k="Taken from your credit" v={<Money cents={o.creditAppliedCents} />} />
+                {o.overageCents > 0 && <Row k={<span className="text-red">Over credit (outstanding)</span>} v={<Money cents={o.overageCents} className="text-red" />} />}
+              </dl>
+              <h3 className="label mt-3 border-t border-line pt-2">Shipping cost</h3>
+              <dl className="space-y-1 text-sm">
+                {o.shippingFeeCents != null ? (
+                  <>
+                    {o.trackingNo && <Row k="Carrier" v={<span>{o.carrier} <span className="text-gray-500">{o.trackingNo}</span></span>} />}
+                    <Row k={<b>Shipping cost</b>} v={<b><Money cents={o.shippingFeeCents} /></b>} />
+                  </>
+                ) : (
+                  <Row k="Shipping cost" v={<span className="text-gray-400">Not shipped yet</span>} />
+                )}
+                <p className="pt-1 text-xs text-gray-500">Billed separately. It is not taken from your credit.</p>
+              </dl>
+            </>
           )}
         </section>
 

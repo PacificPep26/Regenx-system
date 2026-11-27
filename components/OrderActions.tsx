@@ -62,7 +62,7 @@ export function OrderActions({ orderId, status, role, editHref, listHref, compac
         {status === "ON_HOLD" && isAdmin && <button className="btn-primary" disabled={pending} onClick={() => act(() => approveHold(orderId))}>Approve overage</button>}
         {status === "APPROVED" && isOps && <button className="btn-primary" disabled={pending} onClick={() => act(() => packOrder(orderId))}>Order received</button>}
         {(status === "PACKING" || (status === "APPROVED" && isAdmin)) && isOps && <button className="btn" onClick={() => setShipOpen(!shipOpen)}>Enter tracking &amp; ship…</button>}
-        {(status === "SHIPPED" || status === "DELIVERED") && isOps && <button className="btn" onClick={() => setFeeOpen(!feeOpen)}>Shipping fee…</button>}
+        {(status === "SHIPPED" || status === "DELIVERED") && isOps && <button className="btn" onClick={() => setFeeOpen(!feeOpen)}>Shipping cost…</button>}
         {status === "SHIPPED" && isOps && <button className="btn-primary" disabled={pending} onClick={() => act(() => deliverOrder(orderId))}>Mark delivered</button>}
         {canCancel && status !== "DRAFT" && (
           <button
@@ -86,7 +86,7 @@ export function OrderActions({ orderId, status, role, editHref, listHref, compac
       {feeOpen && (
         <form action={feeAction} className="panel grid grid-cols-1 gap-2 p-3 sm:grid-cols-4">
           <input type="hidden" name="orderId" value={orderId} />
-          <div><label className="label">New shipping fee ($)</label><input name="fee" required inputMode="decimal" className="input" placeholder="0.00 = waive" /></div>
+          <div><label className="label">New shipping cost ($)</label><input name="fee" required inputMode="decimal" className="input" placeholder="0.00 = waive" /></div>
           <div className="sm:col-span-3"><label className="label">Reason (required)</label><input name="reason" required minLength={3} className="input" placeholder="e.g. carrier re-weigh, free shipping promo" /></div>
           <div className="flex flex-wrap items-center gap-2 sm:col-span-4">
             <button className="btn-primary" disabled={feeSaving}>Update fee</button>
@@ -102,7 +102,7 @@ export function OrderActions({ orderId, status, role, editHref, listHref, compac
           <div><label className="label">Carrier</label><input name="carrier" required className="input" list="carriers" /></div>
           <datalist id="carriers"><option value="USPS" /><option value="UPS" /><option value="FedEx" /><option value="DHL" /></datalist>
           <div className="sm:col-span-2"><label className="label">Tracking #</label><input name="trackingNo" required className="input" /></div>
-          <div><label className="label">Shipping fee ($)</label><input name="fee" required inputMode="decimal" className="input" placeholder="0.00" /></div>
+          <div><label className="label">Shipping cost ($)</label><input name="fee" required inputMode="decimal" className="input" placeholder="0.00" /></div>
           <div className="sm:col-span-4 flex items-center gap-2">
             <button className="btn-primary" disabled={shipping}>Confirm shipped</button>
             {shipState?.error && <span className="text-sm text-red">{shipState.error}</span>}
